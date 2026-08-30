@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { supabase } from './lib/supabase'
 import Login from './components/Login'
+import GestionProductos from './components/GestionProductos'
 
 interface Perfil {
   nombre: string
@@ -13,14 +14,12 @@ export default function App() {
   const [cargando, setCargando] = useState(true)
 
   useEffect(() => {
-    // 1. Obtener la sesión activa al cargar
     supabase.auth.getSession().then(({ data: { session } }) => {
       setSession(session)
       if (session) obtenerPerfil(session.user.id)
       else setCargando(false)
     })
 
-    // 2. Escuchar cambios de estado (login/logout)
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       setSession(session)
       if (session) obtenerPerfil(session.user.id)
@@ -62,12 +61,10 @@ export default function App() {
     )
   }
 
-  // Si no hay sesión activa, muestra la pantalla de Login
   if (!session) {
     return <Login onLoginSuccess={() => {}} />
   }
 
-  // Si la sesión está activa, muestra el Dashboard inicial
   return (
     <div className="min-h-screen bg-mordiscos-dark text-white p-4 sm:p-6">
       <header className="flex justify-between items-center border-b border-gray-800 pb-4 mb-6">
@@ -92,13 +89,8 @@ export default function App() {
         </div>
       </header>
 
-      <main className="max-w-4xl mx-auto">
-        <div className="bg-mordiscos-card p-6 rounded-xl border border-gray-800 text-center">
-          <h2 className="text-2xl font-bold text-green-400 mb-2">¡Bienvenido al Sistema!</h2>
-          <p className="text-gray-300">
-            Has iniciado sesión correctamente como <strong className="text-mordiscos-orange">{perfil?.nombre}</strong> ({perfil?.rol}).
-          </p>
-        </div>
+      <main className="max-w-5xl mx-auto">
+        <GestionProductos />
       </main>
     </div>
   )
