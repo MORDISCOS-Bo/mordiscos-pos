@@ -1,9 +1,11 @@
+<img src="/logo.png" alt="Mordiscos Logo" className="h-10 w-auto object-contain" />
 import { useEffect, useState } from 'react'
 import { supabase } from './lib/supabase'
 import Login from './components/Login'
 import GestionProductos from './components/GestionProductos'
 import PuntoVenta from './components/PuntoVenta'
 import CocinaKDS from './components/CocinaKDS'
+import Reportes from './components/Reportes'
 
 interface Perfil {
   nombre: string
@@ -14,7 +16,7 @@ export default function App() {
   const [session, setSession] = useState<any>(null)
   const [perfil, setPerfil] = useState<Perfil | null>(null)
   const [cargando, setCargando] = useState(true)
-  const [vistaActual, setVistaActual] = useState<'pos' | 'productos' | 'cocina'>('pos')
+  const [vistaActual, setVistaActual] = useState<'pos' | 'productos' | 'cocina' | 'reportes'>('pos')
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
@@ -101,6 +103,16 @@ export default function App() {
             🍳 Cocina (KDS)
           </button>
           <button
+            onClick={() => setVistaActual('reportes')}
+            className={`px-3 sm:px-4 py-1.5 rounded-md text-xs font-bold transition-all whitespace-nowrap ${
+              vistaActual === 'reportes'
+                ? 'bg-mordiscos-orange text-white shadow'
+                : 'text-gray-400 hover:text-white'
+            }`}
+          >
+            📊 Reportes
+          </button>
+          <button
             onClick={() => setVistaActual('productos')}
             className={`px-3 sm:px-4 py-1.5 rounded-md text-xs font-bold transition-all whitespace-nowrap ${
               vistaActual === 'productos'
@@ -129,6 +141,7 @@ export default function App() {
       <main className="max-w-7xl mx-auto">
         {vistaActual === 'pos' && <PuntoVenta />}
         {vistaActual === 'cocina' && <CocinaKDS />}
+        {vistaActual === 'reportes' && <Reportes />}
         {vistaActual === 'productos' && <GestionProductos />}
       </main>
     </div>

@@ -1,3 +1,4 @@
+<img src="/logo.png" alt="Mordiscos Logo" className="h-10 w-auto object-contain" />
 import { useState } from 'react'
 import { supabase } from '../lib/supabase'
 
