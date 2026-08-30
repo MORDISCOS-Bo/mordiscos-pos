@@ -1,0 +1,15 @@
+@import "tailwindcss";
+
+@theme {
+  --color-mordiscos-red: #D32F2F;
+  --color-mordiscos-orange: #F57C00;
+  --color-mordiscos-dark: #121212;
+  --color-mordiscos-card: #1E1E1E;
+  --color-mordiscos-accent: #FF9800;
+}
+
+body {
+  background-color: var(--color-mordiscos-dark);
+  color: #FFFFFF;
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+}
