@@ -1,45 +1,73 @@
 import { useEffect, useState } from 'react'
 import { supabase } from './lib/supabase'
+import Login from './components/Login'
 
-interface Categoria {
-  id: string
+interface Perfil {
   nombre: string
-  descripcion: string
+  rol: string
 }
 
 export default function App() {
-  const [categorias, setCategorias] = useState<Categoria[]>([])
-  const [cargando, setCargando] = useState<boolean>(true)
-  const [errorConexion, setErrorConexion] = useState<string | null>(null)
+  const [session, setSession] = useState<any>(null)
+  const [perfil, setPerfil] = useState<Perfil | null>(null)
+  const [cargando, setCargando] = useState(true)
 
   useEffect(() => {
-    async function cargarCategorias() {
-      try {
-        const { data, error } = await supabase
-          .from('categorias')
-          .select('id, nombre, descripcion')
+    // 1. Obtener la sesión activa al cargar
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setSession(session)
+      if (session) obtenerPerfil(session.user.id)
+      else setCargando(false)
+    })
 
-        if (error) {
-          // Imprimimos el error detallado en la consola del navegador
-          console.error('Error detallado de Supabase:', error)
-          setErrorConexion(error.message || JSON.stringify(error))
-          return
-        }
-
-        if (data) {
-          setCategorias(data)
-        }
-      } catch (err: any) {
-        console.error('Error atrapado:', err)
-        setErrorConexion(err?.message || 'Error al intentar conectar con el servidor')
-      } finally {
+    // 2. Escuchar cambios de estado (login/logout)
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      setSession(session)
+      if (session) obtenerPerfil(session.user.id)
+      else {
+        setPerfil(null)
         setCargando(false)
       }
-    }
+    })
 
-    cargarCategorias()
+    return () => subscription.unsubscribe()
   }, [])
 
+  const obtenerPerfil = async (userId: string) => {
+    try {
+      const { data, error } = await supabase
+        .from('perfiles')
+        .select('nombre, rol')
+        .eq('id', userId)
+        .single()
+
+      if (error) throw error
+      if (data) setPerfil(data)
+    } catch (err) {
+      console.error('Error cargando perfil:', err)
+    } finally {
+      setCargando(false)
+    }
+  }
+
+  const handleCerrarSesion = async () => {
+    await supabase.auth.signOut()
+  }
+
+  if (cargando) {
+    return (
+      <div className="min-h-screen bg-mordiscos-dark flex items-center justify-center text-white">
+        <p className="animate-pulse text-mordiscos-orange font-semibold">Cargando Mordiscos POS...</p>
+      </div>
+    )
+  }
+
+  // Si no hay sesión activa, muestra la pantalla de Login
+  if (!session) {
+    return <Login onLoginSuccess={() => {}} />
+  }
+
+  // Si la sesión está activa, muestra el Dashboard inicial
   return (
     <div className="min-h-screen bg-mordiscos-dark text-white p-4 sm:p-6">
       <header className="flex justify-between items-center border-b border-gray-800 pb-4 mb-6">
@@ -49,38 +77,27 @@ export default function App() {
           </h1>
           <p className="text-xs sm:text-sm text-gray-400">Wings-Restobar POS</p>
         </div>
-        <span className="bg-green-500/20 text-green-400 px-3 py-1 rounded-full text-xs font-semibold border border-green-500/30">
-          Supabase Conectado
-        </span>
+
+        <div className="flex items-center gap-4">
+          <div className="text-right hidden sm:block">
+            <p className="text-sm font-semibold">{perfil?.nombre || 'Usuario'}</p>
+            <p className="text-xs text-mordiscos-accent uppercase font-mono">{perfil?.rol || 'Rol'}</p>
+          </div>
+          <button
+            onClick={handleCerrarSesion}
+            className="bg-gray-800 hover:bg-red-900/50 text-gray-300 hover:text-red-300 px-3 py-1.5 rounded-lg text-xs font-semibold border border-gray-700 transition-colors"
+          >
+            Cerrar Sesión
+          </button>
+        </div>
       </header>
 
-      <main className="max-w-4xl mx-auto space-y-6">
-        <div className="bg-mordiscos-card p-6 rounded-xl border border-gray-800">
-          <h2 className="text-xl font-bold text-mordiscos-accent mb-4">
-            Categorías del Sistema (Desde la nube)
-          </h2>
-
-          {cargando && <p className="text-gray-400">Cargando datos de Supabase...</p>}
-
-          {errorConexion && (
-            <div className="p-4 bg-red-900/30 border border-red-500/50 rounded-lg text-red-200 text-sm font-mono break-all">
-               Error de conexión: {errorConexion}
-            </div>
-          )}
-
-          {!cargando && !errorConexion && (
-            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
-              {categorias.map((cat) => (
-                <div
-                  key={cat.id}
-                  className="p-3 bg-gray-900 border border-gray-800 rounded-lg hover:border-mordiscos-orange/50 transition-colors"
-                >
-                  <p className="font-semibold text-white">{cat.nombre}</p>
-                  <p className="text-xs text-gray-400 mt-1">{cat.descripcion}</p>
-                </div>
-              ))}
-            </div>
-          )}
+      <main className="max-w-4xl mx-auto">
+        <div className="bg-mordiscos-card p-6 rounded-xl border border-gray-800 text-center">
+          <h2 className="text-2xl font-bold text-green-400 mb-2">¡Bienvenido al Sistema!</h2>
+          <p className="text-gray-300">
+            Has iniciado sesión correctamente como <strong className="text-mordiscos-orange">{perfil?.nombre}</strong> ({perfil?.rol}).
+          </p>
         </div>
       </main>
     </div>
