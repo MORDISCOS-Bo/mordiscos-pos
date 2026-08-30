@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { supabase } from './lib/supabase'
 import Login from './components/Login'
 import GestionProductos from './components/GestionProductos'
+import PuntoVenta from './components/PuntoVenta'
 
 interface Perfil {
   nombre: string
@@ -12,6 +13,7 @@ export default function App() {
   const [session, setSession] = useState<any>(null)
   const [perfil, setPerfil] = useState<Perfil | null>(null)
   const [cargando, setCargando] = useState(true)
+  const [vistaActual, setVistaActual] = useState<'pos' | 'productos'>('pos')
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
@@ -67,12 +69,36 @@ export default function App() {
 
   return (
     <div className="min-h-screen bg-mordiscos-dark text-white p-4 sm:p-6">
-      <header className="flex justify-between items-center border-b border-gray-800 pb-4 mb-6">
+      <header className="flex flex-col sm:flex-row justify-between items-center border-b border-gray-800 pb-4 mb-6 gap-4">
         <div>
           <h1 className="text-2xl sm:text-3xl font-bold text-mordiscos-orange flex items-center gap-2">
             🍗 MORDISCOS
           </h1>
           <p className="text-xs sm:text-sm text-gray-400">Wings-Restobar POS</p>
+        </div>
+
+        {/* Selector de Pestañas */}
+        <div className="flex bg-gray-900 p-1 rounded-lg border border-gray-800">
+          <button
+            onClick={() => setVistaActual('pos')}
+            className={`px-4 py-1.5 rounded-md text-xs font-bold transition-all ${
+              vistaActual === 'pos'
+                ? 'bg-mordiscos-orange text-white shadow'
+                : 'text-gray-400 hover:text-white'
+            }`}
+          >
+            🛒 Punto de Venta
+          </button>
+          <button
+            onClick={() => setVistaActual('productos')}
+            className={`px-4 py-1.5 rounded-md text-xs font-bold transition-all ${
+              vistaActual === 'productos'
+                ? 'bg-mordiscos-orange text-white shadow'
+                : 'text-gray-400 hover:text-white'
+            }`}
+          >
+            📋 Menú y Productos
+          </button>
         </div>
 
         <div className="flex items-center gap-4">
@@ -89,8 +115,8 @@ export default function App() {
         </div>
       </header>
 
-      <main className="max-w-5xl mx-auto">
-        <GestionProductos />
+      <main className="max-w-7xl mx-auto">
+        {vistaActual === 'pos' ? <PuntoVenta /> : <GestionProductos />}
       </main>
     </div>
   )
