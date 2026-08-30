@@ -3,6 +3,7 @@ import { supabase } from './lib/supabase'
 import Login from './components/Login'
 import GestionProductos from './components/GestionProductos'
 import PuntoVenta from './components/PuntoVenta'
+import CocinaKDS from './components/CocinaKDS'
 
 interface Perfil {
   nombre: string
@@ -13,7 +14,7 @@ export default function App() {
   const [session, setSession] = useState<any>(null)
   const [perfil, setPerfil] = useState<Perfil | null>(null)
   const [cargando, setCargando] = useState(true)
-  const [vistaActual, setVistaActual] = useState<'pos' | 'productos'>('pos')
+  const [vistaActual, setVistaActual] = useState<'pos' | 'productos' | 'cocina'>('pos')
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
@@ -78,10 +79,10 @@ export default function App() {
         </div>
 
         {/* Selector de Pestañas */}
-        <div className="flex bg-gray-900 p-1 rounded-lg border border-gray-800">
+        <div className="flex bg-gray-900 p-1 rounded-lg border border-gray-800 overflow-x-auto">
           <button
             onClick={() => setVistaActual('pos')}
-            className={`px-4 py-1.5 rounded-md text-xs font-bold transition-all ${
+            className={`px-3 sm:px-4 py-1.5 rounded-md text-xs font-bold transition-all whitespace-nowrap ${
               vistaActual === 'pos'
                 ? 'bg-mordiscos-orange text-white shadow'
                 : 'text-gray-400 hover:text-white'
@@ -90,14 +91,24 @@ export default function App() {
             🛒 Punto de Venta
           </button>
           <button
+            onClick={() => setVistaActual('cocina')}
+            className={`px-3 sm:px-4 py-1.5 rounded-md text-xs font-bold transition-all whitespace-nowrap ${
+              vistaActual === 'cocina'
+                ? 'bg-mordiscos-orange text-white shadow'
+                : 'text-gray-400 hover:text-white'
+            }`}
+          >
+            🍳 Cocina (KDS)
+          </button>
+          <button
             onClick={() => setVistaActual('productos')}
-            className={`px-4 py-1.5 rounded-md text-xs font-bold transition-all ${
+            className={`px-3 sm:px-4 py-1.5 rounded-md text-xs font-bold transition-all whitespace-nowrap ${
               vistaActual === 'productos'
                 ? 'bg-mordiscos-orange text-white shadow'
                 : 'text-gray-400 hover:text-white'
             }`}
           >
-            📋 Menú y Productos
+            📋 Productos
           </button>
         </div>
 
@@ -116,7 +127,9 @@ export default function App() {
       </header>
 
       <main className="max-w-7xl mx-auto">
-        {vistaActual === 'pos' ? <PuntoVenta /> : <GestionProductos />}
+        {vistaActual === 'pos' && <PuntoVenta />}
+        {vistaActual === 'cocina' && <CocinaKDS />}
+        {vistaActual === 'productos' && <GestionProductos />}
       </main>
     </div>
   )
