@@ -10,6 +10,7 @@ export default function PuntoVenta() {
   // Estado del Carrito / Comanda actual
   const [carrito, setCarrito] = useState<ItemCarrito[]>([])
   const [tipoPedido, setTipoPedido] = useState<'mesa' | 'llevar' | 'delivery'>('mesa')
+  const [metodoPago, setMetodoPago] = useState<'efectivo' | 'qr' | 'tarjeta'>('efectivo')
   const [mesa, setMesa] = useState('')
   const [cliente, setCliente] = useState('')
   const [enviando, setEnviando] = useState(false)
@@ -71,6 +72,7 @@ export default function PuntoVenta() {
             mesa: tipoPedido === 'mesa' ? mesa : null,
             cliente_nombre: cliente || 'Cliente Mostrador',
             total: totalPedido,
+            metodo_pago: metodoPago,
             estado: 'pendiente',
             usuario_id: user?.id,
           },
@@ -92,7 +94,7 @@ export default function PuntoVenta() {
       const { error: errDetalles } = await supabase.from('pedido_detalles').insert(detalles)
       if (errDetalles) throw errDetalles
 
-      alert(`¡Pedido #${pedidoGuardado.numero_pedido} enviado a cocina exitosamente! 🍗`)
+      alert(`¡Pedido #${pedidoGuardado.numero_pedido} enviado exitosamente! 🍗`)
       
       // Limpiar comanda
       setCarrito([])
@@ -206,10 +208,30 @@ export default function PuntoVenta() {
                 }`}
               />
             </div>
+
+            {/* Selector de Método de Pago */}
+            <div className="pt-2">
+              <label className="text-[10px] text-gray-400 uppercase font-semibold block mb-1">Método de Pago:</label>
+              <div className="grid grid-cols-3 gap-1.5">
+                {(['efectivo', 'qr', 'tarjeta'] as const).map((m) => (
+                  <button
+                    key={m}
+                    onClick={() => setMetodoPago(m)}
+                    className={`py-1 rounded text-[11px] font-bold uppercase border transition-all ${
+                      metodoPago === m
+                        ? 'bg-mordiscos-orange text-white border-mordiscos-orange'
+                        : 'bg-gray-900 text-gray-400 border-gray-800'
+                    }`}
+                  >
+                    {m}
+                  </button>
+                ))}
+              </div>
+            </div>
           </div>
 
           {/* Lista de Ítems en Carrito */}
-          <div className="space-y-2 max-h-60 overflow-y-auto pr-1">
+          <div className="space-y-2 max-h-52 overflow-y-auto pr-1">
             {carrito.length === 0 ? (
               <p className="text-xs text-gray-500 text-center py-8">Selecciona productos de la izquierda</p>
             ) : (

@@ -1,4 +1,3 @@
-<img src="/logo.png" alt="Mordiscos Logo" className="h-10 w-auto object-contain" />
 import { useEffect, useState } from 'react'
 import { supabase } from './lib/supabase'
 import Login from './components/Login'
@@ -6,6 +5,7 @@ import GestionProductos from './components/GestionProductos'
 import PuntoVenta from './components/PuntoVenta'
 import CocinaKDS from './components/CocinaKDS'
 import Reportes from './components/Reportes'
+import ArqueoCaja from './components/ArqueoCaja'
 
 interface Perfil {
   nombre: string
@@ -16,7 +16,7 @@ export default function App() {
   const [session, setSession] = useState<any>(null)
   const [perfil, setPerfil] = useState<Perfil | null>(null)
   const [cargando, setCargando] = useState(true)
-  const [vistaActual, setVistaActual] = useState<'pos' | 'productos' | 'cocina' | 'reportes'>('pos')
+  const [vistaActual, setVistaActual] = useState<'pos' | 'productos' | 'cocina' | 'reportes' | 'arqueo'>('pos')
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
@@ -73,11 +73,22 @@ export default function App() {
   return (
     <div className="min-h-screen bg-mordiscos-dark text-white p-4 sm:p-6">
       <header className="flex flex-col sm:flex-row justify-between items-center border-b border-gray-800 pb-4 mb-6 gap-4">
-        <div>
-          <h1 className="text-2xl sm:text-3xl font-bold text-mordiscos-orange flex items-center gap-2">
-            🍗 MORDISCOS
-          </h1>
-          <p className="text-xs sm:text-sm text-gray-400">Wings-Restobar POS</p>
+        {/* LOGO EN EL HEADER */}
+        <div className="flex items-center gap-3">
+          <img 
+            src="/logo.png" 
+            alt="Mordiscos Logo" 
+            className="h-10 w-auto object-contain"
+            onError={(e) => {
+              e.currentTarget.style.display = 'none';
+            }}
+          />
+          <div>
+            <h1 className="text-2xl sm:text-3xl font-black text-mordiscos-orange tracking-wider">
+              MORDISCOS
+            </h1>
+            <p className="text-xs text-gray-400">Wings-Restobar POS</p>
+          </div>
         </div>
 
         {/* Selector de Pestañas */}
@@ -101,6 +112,16 @@ export default function App() {
             }`}
           >
             🍳 Cocina (KDS)
+          </button>
+          <button
+            onClick={() => setVistaActual('arqueo')}
+            className={`px-3 sm:px-4 py-1.5 rounded-md text-xs font-bold transition-all whitespace-nowrap ${
+              vistaActual === 'arqueo'
+                ? 'bg-mordiscos-orange text-white shadow'
+                : 'text-gray-400 hover:text-white'
+            }`}
+          >
+            💰 Arqueo de Caja
           </button>
           <button
             onClick={() => setVistaActual('reportes')}
@@ -141,6 +162,7 @@ export default function App() {
       <main className="max-w-7xl mx-auto">
         {vistaActual === 'pos' && <PuntoVenta />}
         {vistaActual === 'cocina' && <CocinaKDS />}
+        {vistaActual === 'arqueo' && <ArqueoCaja />}
         {vistaActual === 'reportes' && <Reportes />}
         {vistaActual === 'productos' && <GestionProductos />}
       </main>
