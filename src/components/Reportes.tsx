@@ -8,6 +8,7 @@ const CLAVE_ANULACION = '0101'
 export default function Reportes() {
   const [pedidos, setPedidos] = useState<Pedido[]>([])
   const [cargando, setCargando] = useState(true)
+  const [errorMsj, setErrorMsj] = useState<string | null>(null)
 
   useEffect(() => {
     cargarReportes()
@@ -15,15 +16,26 @@ export default function Reportes() {
 
   const cargarReportes = async () => {
     setCargando(true)
-    const { data, error } = await supabase
-      .from('pedidos')
-      .select('*')
-      .order('created_at', { ascending: false })
+    setErrorMsj(null)
+    
+    try {
+      const { data, error } = await supabase
+        .from('pedidos')
+        .select('*')
+        .order('created_at', { ascending: false })
 
-    if (data && !error) {
-      setPedidos(data)
+      if (error) {
+        console.error('Error Supabase:', error)
+        setErrorMsj(error.message)
+      } else if (data) {
+        setPedidos(data)
+      }
+    } catch (err: any) {
+      console.error('Error general:', err)
+      setErrorMsj(err.message || 'Error desconocido')
+    } finally {
+      setCargando(false)
     }
-    setCargando(false)
   }
 
   // FUNCIÓN PARA ANULAR VENTA CON CONTRASEÑA
@@ -40,7 +52,6 @@ export default function Reportes() {
     }
 
     try {
-      // Marcar como cancelado
       const { error } = await supabase
         .from('pedidos')
         .update({ estado: 'cancelado' })
@@ -57,7 +68,7 @@ export default function Reportes() {
 
   // Métricas calculadas (excluyendo ventas anuladas/canceladas)
   const pedidosValidos = pedidos.filter((p) => p.estado !== 'cancelado')
-  const totalIngresos = pedidosValidos.reduce((acc, p) => acc + p.total, 0)
+  const totalIngresos = pedidosValidos.reduce((acc, p) => acc + (p.total || 0), 0)
   const totalPedidos = pedidosValidos.length
   const pedidosMesa = pedidosValidos.filter((p) => p.tipo === 'mesa').length
   const pedidosLlevarDelivery = pedidosValidos.filter((p) => p.tipo !== 'mesa').length
@@ -65,12 +76,26 @@ export default function Reportes() {
   return (
     <div className="space-y-6">
       {/* CABECERA */}
-      <div>
-        <h2 className="text-xl font-bold text-white flex items-center gap-2">
-          📊 Reporte de Ventas y Caja
-        </h2>
-        <p className="text-xs text-gray-400">Resumen general de ingresos e historial de comisiones</p>
+      <div className="flex justify-between items-center">
+        <div>
+          <h2 className="text-xl font-bold text-white flex items-center gap-2">
+            📊 Reporte de Ventas y Caja
+          </h2>
+          <p className="text-xs text-gray-400">Resumen general de ingresos e historial de comisiones</p>
+        </div>
+        <button
+          onClick={cargarReportes}
+          className="bg-gray-800 hover:bg-gray-700 text-gray-200 text-xs px-3 py-1.5 rounded-lg border border-gray-700 transition-all font-semibold"
+        >
+          🔄 Actualizar
+        </button>
       </div>
+
+      {errorMsj && (
+        <div className="p-3 bg-red-900/40 border border-red-800 text-red-300 text-xs rounded-xl">
+          ⚠️ <strong>Error al cargar ventas:</strong> {errorMsj}. Si no aparece nada, revisa las políticas RLS en Supabase.
+        </div>
+      )}
 
       {/* TARJETAS DE MÉTRICAS */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -151,13 +176,13 @@ export default function Reportes() {
                           </span>
                         ) : (
                           <span className="bg-emerald-900/50 text-emerald-400 border border-emerald-800/60 px-2 py-0.5 rounded font-bold text-[10px] uppercase">
-                            {p.estado}
+                            {p.estado || 'pendiente'}
                           </span>
                         )}
                       </td>
                       <td className="py-3 px-4 text-gray-400">{hora}</td>
                       <td className="py-3 px-4 text-right font-extrabold text-mordiscos-orange">
-                        Bs {p.total.toFixed(2)}
+                        Bs {(p.total || 0).toFixed(2)}
                       </td>
                       <td className="py-3 px-4 text-center">
                         {p.estado !== 'cancelado' ? (
