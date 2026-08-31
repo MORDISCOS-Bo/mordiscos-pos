@@ -26,7 +26,7 @@ export default function Login({ onLoginSuccess }: LoginProps) {
       onLoginSuccess()
     } catch (err: any) {
       setError(err.message || 'Error al iniciar sesión')
-    } font-semibold {
+    } finally {
       setCargando(false)
     }
   }
@@ -41,7 +41,6 @@ export default function Login({ onLoginSuccess }: LoginProps) {
             alt="Mordiscos Logo" 
             className="h-20 w-auto object-contain drop-shadow-md" 
             onError={(e) => {
-              // Si la imagen falla en cargar, muestra el emoji por defecto
               e.currentTarget.style.display = 'none';
             }}
           />
