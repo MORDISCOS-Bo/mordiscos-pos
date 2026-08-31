@@ -2,8 +2,8 @@ import { useEffect, useState } from 'react'
 import { supabase } from '../lib/supabase'
 import type { Categoria, Producto, ItemCarrito, Pedido } from '../types/database'
 
-// 🔑 CAMBIA AQUÍ TU CONTRASEÑA PARA ANULAR VENTAS
-const CLAVE_ANULACION = '0101'
+// 🔑 CLAVE DE AUTORIZACIÓN PARA ANULAR VENTAS
+const CLAVE_ANULACION = '1234'
 
 export default function PuntoVenta() {
   const [categorias, setCategorias] = useState<Categoria[]>([])
@@ -37,7 +37,7 @@ export default function PuntoVenta() {
     const { data } = await supabase
       .from('pedidos')
       .select('*')
-      .order('created_at', { ascending: false })
+      .order('id', { ascending: false })
       .limit(10)
 
     if (data) setUltimosPedidos(data)
@@ -71,6 +71,7 @@ export default function PuntoVenta() {
 
   const totalPedido = carrito.reduce((acc, item) => acc + item.producto.precio * item.cantidad, 0)
 
+  // CREAR PEDIDO REINICIANDO NÚMERO SEGÚN EL ÚLTIMO ARQUEO DE CAJA
   const handleCrearPedido = async () => {
     if (carrito.length === 0) return alert('El carrito está vacío.')
     if (tipoPedido === 'mesa' && !mesa) return alert('Por favor ingresa el número o nombre de mesa.')
@@ -79,10 +80,34 @@ export default function PuntoVenta() {
     try {
       const user = (await supabase.auth.getUser()).data.user
 
+      // 1. Obtener la fecha del último cierre de caja
+      const { data: ultimoArqueo } = await supabase
+        .from('arqueo_caja')
+        .select('created_at')
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle()
+
+      const fechaUltimoCierre = ultimoArqueo?.created_at || null
+
+      // 2. Contar cuántos pedidos existen DESPUÉS del último cierre
+      let queryPedidos = supabase
+        .from('pedidos')
+        .select('id', { count: 'exact', head: true })
+
+      if (fechaUltimoCierre) {
+        queryPedidos = queryPedidos.gt('created_at', fechaUltimoCierre)
+      }
+
+      const { count } = await queryPedidos
+      const nuevoNumeroPedido = (count || 0) + 1
+
+      // 3. Crear el pedido con el nuevo número correlativo
       const { data: pedidoGuardado, error: errPedido } = await supabase
         .from('pedidos')
         .insert([
           {
+            numero_pedido: nuevoNumeroPedido,
             tipo: tipoPedido,
             mesa: tipoPedido === 'mesa' ? mesa : null,
             cliente_nombre: cliente || 'Cliente Mostrador',
@@ -108,7 +133,7 @@ export default function PuntoVenta() {
       const { error: errDetalles } = await supabase.from('pedido_detalles').insert(detalles)
       if (errDetalles) throw errDetalles
 
-      alert(`¡Pedido #${pedidoGuardado.numero_pedido || ''} registrado exitosamente! 🍗`)
+      alert(`¡Pedido #${pedidoGuardado.numero_pedido} registrado exitosamente! 🍗`)
       
       setCarrito([])
       setMesa('')
@@ -121,11 +146,11 @@ export default function PuntoVenta() {
     }
   }
 
-  // FUNCIÓN PARA ANULAR VENTA CON CONTRASEÑA
+  // ANULAR VENTA CON CONTRASEÑA
   const handleAnularPedido = async (pedido: Pedido) => {
     const clave = prompt(`Ingresa la contraseña de autorización para anular el pedido #${pedido.numero_pedido || ''}:`)
 
-    if (clave === null) return // Cancelado por el usuario
+    if (clave === null) return
 
     if (clave !== CLAVE_ANULACION) {
       alert('❌ Contraseña incorrecta. No tienes permisos para anular ventas.')
@@ -149,10 +174,10 @@ export default function PuntoVenta() {
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 relative">
-      {/* SECCIÓN IZQUIERDA: Catálogo de Productos y Últimas Ventas */}
+      {/* SECCIÓN IZQUIERDA: Catálogo y Últimas Ventas */}
       <div className="lg:col-span-2 space-y-6 relative min-h-[500px]">
         
-        {/* LOGO MARCA DE AGUA GIGANTE Y CENTRADO EN EL FONDO */}
+        {/* LOGO MARCA DE AGUA GIGANTE CENTRADO */}
         <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-0 opacity-15 overflow-hidden">
           <img 
             src="/logo.png" 
@@ -161,7 +186,7 @@ export default function PuntoVenta() {
           />
         </div>
 
-        {/* Filtro por Categorías */}
+        {/* Categorías */}
         <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-thin relative z-10">
           <button
             onClick={() => setCatSeleccionada('todas')}
@@ -188,7 +213,7 @@ export default function PuntoVenta() {
           ))}
         </div>
 
-        {/* LISTADO DE PRODUCTOS EN MODO "TODAS" O MODO FILTRADO */}
+        {/* Productos */}
         <div className="space-y-6 relative z-10">
           {catSeleccionada === 'todas' ? (
             categorias.map((cat) => {
@@ -243,7 +268,7 @@ export default function PuntoVenta() {
           )}
         </div>
 
-        {/* SECCIÓN DE ÚLTIMAS VENTAS PARA ANULAR SI HUBO UN ERROR */}
+        {/* Últimas Ventas */}
         <div className="relative z-10 pt-6 border-t border-gray-800">
           <h3 className="text-sm font-bold text-gray-300 mb-3 flex items-center justify-between">
             <span>Últimas Ventas Realizadas</span>
