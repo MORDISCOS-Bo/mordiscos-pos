@@ -7,7 +7,6 @@ export default function PuntoVenta() {
   const [productos, setProductos] = useState<Producto[]>([])
   const [catSeleccionada, setCatSeleccionada] = useState<string>('todas')
   
-  // Estado del Carrito / Comanda actual
   const [carrito, setCarrito] = useState<ItemCarrito[]>([])
   const [tipoPedido, setTipoPedido] = useState<'mesa' | 'llevar' | 'delivery'>('mesa')
   const [metodoPago, setMetodoPago] = useState<'efectivo' | 'qr' | 'tarjeta'>('efectivo')
@@ -63,7 +62,6 @@ export default function PuntoVenta() {
     try {
       const user = (await supabase.auth.getUser()).data.user
 
-      // 1. Guardar la cabecera del pedido
       const { data: pedidoGuardado, error: errPedido } = await supabase
         .from('pedidos')
         .insert([
@@ -82,7 +80,6 @@ export default function PuntoVenta() {
 
       if (errPedido) throw errPedido
 
-      // 2. Guardar el detalle de ítems
       const detalles = carrito.map((item) => ({
         pedido_id: pedidoGuardado.id,
         producto_id: item.producto.id,
@@ -96,7 +93,6 @@ export default function PuntoVenta() {
 
       alert(`¡Pedido #${pedidoGuardado.numero_pedido} enviado exitosamente! 🍗`)
       
-      // Limpiar comanda
       setCarrito([])
       setMesa('')
       setCliente('')
@@ -107,17 +103,17 @@ export default function PuntoVenta() {
     }
   }
 
-  const productosFiltrados =
-    catSeleccionada === 'todas'
-      ? productos
-      : productos.filter((p) => p.categoria_id === catSeleccionada)
-
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+    <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 relative">
       {/* SECCIÓN IZQUIERDA: Catálogo de Productos */}
-      <div className="lg:col-span-2 space-y-4">
+      <div className="lg:col-span-2 space-y-4 relative">
+        {/* LOGO MARCA DE AGUA SEMITRANSPARENTE EN EL CENTRO */}
+        <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-0 opacity-10">
+          <img src="/logo.png" alt="Marca de Agua" className="max-w-xs md:max-w-md object-contain" />
+        </div>
+
         {/* Filtro por Categorías */}
-        <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-thin">
+        <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-thin relative z-10">
           <button
             onClick={() => setCatSeleccionada('todas')}
             className={`px-4 py-2 rounded-lg text-xs font-bold whitespace-nowrap transition-colors ${
@@ -143,34 +139,69 @@ export default function PuntoVenta() {
           ))}
         </div>
 
-        {/* Grilla de Productos */}
-        <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-          {productosFiltrados.map((prod) => (
-            <button
-              key={prod.id}
-              onClick={() => agregarAlCarrito(prod)}
-              className="bg-mordiscos-card hover:border-mordiscos-orange p-3 rounded-xl border border-gray-800 text-left transition-all flex flex-col justify-between h-28 shadow-md hover:scale-[1.02]"
-            >
-              <div>
-                <p className="font-bold text-white text-sm line-clamp-2">{prod.nombre}</p>
-                {prod.descripcion && (
-                  <p className="text-[10px] text-gray-400 line-clamp-1 mt-1">{prod.descripcion}</p>
-                )}
-              </div>
-              <p className="text-mordiscos-accent font-extrabold text-sm">Bs {prod.precio.toFixed(2)}</p>
-            </button>
-          ))}
+        {/* LISTADO DE PRODUCTOS EN MODO "TODAS" (SEPARADOS POR CATEGORÍA) O MODO FILTRADO */}
+        <div className="space-y-6 relative z-10">
+          {catSeleccionada === 'todas' ? (
+            categorias.map((cat) => {
+              const prodsCat = productos.filter((p) => p.categoria_id === cat.id)
+              if (prodsCat.length === 0) return null
+
+              return (
+                <div key={cat.id} className="space-y-2">
+                  <h3 className="text-xs font-bold text-mordiscos-orange uppercase tracking-wider border-b border-gray-800/80 pb-1">
+                    {cat.nombre}
+                  </h3>
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                    {prodsCat.map((prod) => (
+                      <button
+                        key={prod.id}
+                        onClick={() => agregarAlCarrito(prod)}
+                        className="bg-mordiscos-card/90 backdrop-blur-sm hover:border-mordiscos-orange p-3 rounded-xl border border-gray-800 text-left transition-all flex flex-col justify-between h-28 shadow-md hover:scale-[1.02]"
+                      >
+                        <div>
+                          <p className="font-bold text-white text-sm line-clamp-2">{prod.nombre}</p>
+                          {prod.descripcion && (
+                            <p className="text-[10px] text-gray-400 line-clamp-1 mt-1">{prod.descripcion}</p>
+                          )}
+                        </div>
+                        <p className="text-mordiscos-accent font-extrabold text-sm">Bs {prod.precio.toFixed(2)}</p>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )
+            })
+          ) : (
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+              {productos
+                .filter((p) => p.categoria_id === catSeleccionada)
+                .map((prod) => (
+                  <button
+                    key={prod.id}
+                    onClick={() => agregarAlCarrito(prod)}
+                    className="bg-mordiscos-card/90 backdrop-blur-sm hover:border-mordiscos-orange p-3 rounded-xl border border-gray-800 text-left transition-all flex flex-col justify-between h-28 shadow-md hover:scale-[1.02]"
+                  >
+                    <div>
+                      <p className="font-bold text-white text-sm line-clamp-2">{prod.nombre}</p>
+                      {prod.descripcion && (
+                        <p className="text-[10px] text-gray-400 line-clamp-1 mt-1">{prod.descripcion}</p>
+                      )}
+                    </div>
+                    <p className="text-mordiscos-accent font-extrabold text-sm">Bs {prod.precio.toFixed(2)}</p>
+                  </button>
+                ))}
+            </div>
+          )}
         </div>
       </div>
 
       {/* SECCIÓN DERECHA: Comanda / Carrito */}
-      <div className="bg-mordiscos-card p-5 rounded-xl border border-gray-800 flex flex-col justify-between h-[calc(100vh-140px)] sticky top-4">
+      <div className="bg-mordiscos-card p-5 rounded-xl border border-gray-800 flex flex-col justify-between h-[calc(100vh-140px)] sticky top-4 z-10">
         <div>
           <h3 className="text-lg font-bold text-mordiscos-orange border-b border-gray-800 pb-3 mb-4">
             Comanda Actual
           </h3>
 
-          {/* Opciones del Pedido */}
           <div className="space-y-3 mb-4">
             <div className="flex gap-2">
               {(['mesa', 'llevar', 'delivery'] as const).map((t) => (
@@ -209,7 +240,6 @@ export default function PuntoVenta() {
               />
             </div>
 
-            {/* Selector de Método de Pago */}
             <div className="pt-2">
               <label className="text-[10px] text-gray-400 uppercase font-semibold block mb-1">Método de Pago:</label>
               <div className="grid grid-cols-3 gap-1.5">
@@ -230,7 +260,6 @@ export default function PuntoVenta() {
             </div>
           </div>
 
-          {/* Lista de Ítems en Carrito */}
           <div className="space-y-2 max-h-52 overflow-y-auto pr-1">
             {carrito.length === 0 ? (
               <p className="text-xs text-gray-500 text-center py-8">Selecciona productos de la izquierda</p>
@@ -266,7 +295,6 @@ export default function PuntoVenta() {
           </div>
         </div>
 
-        {/* Total y Botón de Enviar */}
         <div className="border-t border-gray-800 pt-4 mt-4 space-y-3">
           <div className="flex justify-between text-base font-extrabold text-white">
             <span>Total:</span>

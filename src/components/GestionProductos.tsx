@@ -6,14 +6,14 @@ export default function GestionProductos() {
   const [categorias, setCategorias] = useState<Categoria[]>([])
   const [productos, setProductos] = useState<Producto[]>([])
   const [cargando, setCargando] = useState(true)
-  const [modalAbierto, setModalAbierto] = useState(false)
 
-  // Campos del formulario para un nuevo producto
+  // Estados Formulario (Crear/Editar)
+  const [editandoId, setEditandoId] = useState<string | null>(null)
   const [nombre, setNombre] = useState('')
-  const [categoriaId, setCategoriaId] = useState('')
-  const [precio, setPrecio] = useState('')
-  const [costo, setCosto] = useState('')
   const [descripcion, setDescripcion] = useState('')
+  const [precio, setPrecio] = useState('')
+  const [categoriaId, setCategoriaId] = useState('')
+  const [disponible, setDisponible] = useState(true)
   const [guardando, setGuardando] = useState(false)
 
   useEffect(() => {
@@ -22,236 +22,231 @@ export default function GestionProductos() {
 
   const cargarDatos = async () => {
     setCargando(true)
-    try {
-      // 1. Cargar Categorías
-      const { data: catData } = await supabase.from('categorias').select('*').order('nombre')
-      if (catData) setCategorias(catData)
+    const { data: catData } = await supabase.from('categorias').select('*').order('nombre')
+    if (catData) setCategorias(catData)
 
-      // 2. Cargar Productos
-      const { data: prodData } = await supabase.from('productos').select('*').order('nombre')
-      if (prodData) setProductos(prodData)
-    } catch (err) {
-      console.error('Error cargando menú:', err)
-    } finally {
-      setCargando(false)
-    }
+    const { data: prodData } = await supabase.from('productos').select('*').order('nombre')
+    if (prodData) setProductos(prodData)
+
+    setCargando(false)
   }
 
-  const handleCrearProducto = async (e: React.FormEvent) => {
+  const resetFormulario = () => {
+    setEditandoId(null)
+    setNombre('')
+    setDescripcion('')
+    setPrecio('')
+    setCategoriaId('')
+    setDisponible(true)
+  }
+
+  const iniciarEdicion = (prod: Producto) => {
+    setEditandoId(prod.id)
+    setNombre(prod.nombre)
+    setDescripcion(prod.descripcion || '')
+    setPrecio(prod.precio.toString())
+    setCategoriaId(prod.categoria_id || '')
+    setDisponible(prod.disponible ?? true)
+  }
+
+  const handleGuardarProducto = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!categoriaId) {
-      alert('Por favor selecciona una categoría')
-      return
-    }
+    if (!nombre || !precio) return alert('Completa nombre y precio')
 
     setGuardando(true)
     try {
-      const { error } = await supabase.from('productos').insert([
-        {
-          nombre,
-          categoria_id: categoriaId,
-          precio: parseFloat(precio),
-          costo: parseFloat(costo) || 0,
-          descripcion,
-          disponible: true,
-        },
-      ])
+      if (editandoId) {
+        // Modo Edición
+        const { error } = await supabase
+          .from('productos')
+          .update({
+            nombre,
+            descripcion,
+            precio: parseFloat(precio),
+            categoria_id: categoriaId || null,
+            disponible,
+          })
+          .eq('id', editandoId)
 
-      if (error) throw error
+        if (error) throw error
+        alert('¡Producto actualizado exitosamente!')
+      } else {
+        // Modo Crear
+        const { error } = await supabase.from('productos').insert([
+          {
+            nombre,
+            descripcion,
+            precio: parseFloat(precio),
+            categoria_id: categoriaId || null,
+            disponible,
+          },
+        ])
 
-      // Limpiar formulario y recargar
-      setNombre('')
-      setPrecio('')
-      setCosto('')
-      setDescripcion('')
-      setModalAbierto(false)
+        if (error) throw error
+        alert('¡Producto creado exitosamente!')
+      }
+
+      resetFormulario()
       cargarDatos()
     } catch (err: any) {
-      alert('Error al guardar el producto: ' + err.message)
+      alert('Error al guardar: ' + err.message)
     } finally {
       setGuardando(false)
     }
   }
 
-  const toggleDisponibilidad = async (id: string, estadoActual: boolean) => {
-    try {
-      const { error } = await supabase
-        .from('productos')
-        .update({ disponible: !estadoActual })
-        .eq('id', id)
+  const handleEliminarProducto = async (id: string, nombreProd: string) => {
+    if (!confirm(`¿Estás seguro de eliminar "${nombreProd}"? Esta acción no se puede deshacer.`)) return
 
+    try {
+      const { error } = await supabase.from('productos').delete().eq('id', id)
       if (error) throw error
+      alert('Producto eliminado correctamente.')
       cargarDatos()
     } catch (err: any) {
-      alert('Error cambiando estado: ' + err.message)
+      alert('Error eliminando producto: ' + err.message)
     }
   }
 
-  if (cargando) {
-    return <p className="text-gray-400 text-center py-8">Cargando menú de Mordiscos...</p>
-  }
+  if (cargando) return <p className="text-gray-400 text-center py-8">Cargando catálogo...</p>
 
   return (
-    <div className="space-y-6">
-      {/* Encabezado con Botón de Acción */}
-      <div className="flex justify-between items-center">
-        <div>
-          <h2 className="text-xl font-bold text-white">Menú de Productos</h2>
-          <p className="text-xs text-gray-400">Administra los productos de tu restobar</p>
+    <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      {/* Formulario Crear / Editar */}
+      <div className="bg-mordiscos-card p-5 rounded-xl border border-gray-800 h-fit">
+        <div className="flex justify-between items-center border-b border-gray-800 pb-3 mb-4">
+          <h2 className="text-base font-bold text-mordiscos-orange">
+            {editandoId ? '✏️ Editar Producto' : '➕ Nuevo Producto'}
+          </h2>
+          {editandoId && (
+            <button
+              onClick={resetFormulario}
+              className="text-xs text-gray-400 hover:text-white underline"
+            >
+              Cancelar
+            </button>
+          )}
         </div>
-        <button
-          onClick={() => setModalAbierto(true)}
-          className="bg-mordiscos-red hover:bg-red-700 text-white font-bold px-4 py-2 rounded-lg text-sm transition-colors shadow-lg"
-        >
-          + Agregar Producto
-        </button>
-      </div>
 
-      {/* Lista de Productos Agrupados por Categoría */}
-      <div className="space-y-6">
-        {categorias.map((cat) => {
-          const prodsDeCat = productos.filter((p) => p.categoria_id === cat.id)
-
-          return (
-            <div key={cat.id} className="bg-mordiscos-card p-4 rounded-xl border border-gray-800">
-              <h3 className="text-lg font-bold text-mordiscos-orange mb-3 border-b border-gray-800 pb-2">
-                {cat.nombre} ({prodsDeCat.length})
-              </h3>
-
-              {prodsDeCat.length === 0 ? (
-                <p className="text-xs text-gray-500 italic">No hay productos en esta categoría.</p>
-              ) : (
-                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
-                  {prodsDeCat.map((prod) => (
-                    <div
-                      key={prod.id}
-                      className={`p-3 rounded-lg border flex justify-between items-start transition-colors ${
-                        prod.disponible
-                          ? 'bg-gray-900 border-gray-800'
-                          : 'bg-red-950/20 border-red-900/40 opacity-60'
-                      }`}
-                    >
-                      <div>
-                        <p className="font-bold text-white text-sm">{prod.nombre}</p>
-                        {prod.descripcion && (
-                          <p className="text-xs text-gray-400 mt-0.5 line-clamp-1">{prod.descripcion}</p>
-                        )}
-                        <p className="text-mordiscos-accent font-extrabold text-sm mt-2">
-                          Bs {prod.precio.toFixed(2)}
-                        </p>
-                      </div>
-
-                      <button
-                        onClick={() => toggleDisponibilidad(prod.id, prod.disponible)}
-                        className={`text-xs px-2 py-1 rounded font-semibold ${
-                          prod.disponible
-                            ? 'bg-green-900/40 text-green-400 border border-green-800'
-                            : 'bg-red-900/40 text-red-400 border border-red-800'
-                        }`}
-                      >
-                        {prod.disponible ? 'Disponible' : 'Agotado'}
-                      </button>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          )
-        })}
-      </div>
-
-      {/* Modal para Agregar Nuevo Producto */}
-      {modalAbierto && (
-        <div className="fixed inset-0 bg-black/80 flex items-center justify-center p-4 z-50">
-          <div className="bg-mordiscos-card p-6 rounded-xl border border-gray-800 max-w-md w-full">
-            <h3 className="text-lg font-bold text-mordiscos-orange mb-4">Agregar Nuevo Producto</h3>
-
-            <form onSubmit={handleCrearProducto} className="space-y-4">
-              <div>
-                <label className="block text-xs font-semibold text-gray-300 mb-1">Categoría</label>
-                <select
-                  required
-                  value={categoriaId}
-                  onChange={(e) => setCategoriaId(e.target.value)}
-                  className="w-full px-3 py-2 bg-gray-900 border border-gray-800 rounded-lg text-white text-sm"
-                >
-                  <option value="">Selecciona una categoría...</option>
-                  {categorias.map((c) => (
-                    <option key={c.id} value={c.id}>
-                      {c.nombre}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              <div>
-                <label className="block text-xs font-semibold text-gray-300 mb-1">Nombre del Producto</label>
-                <input
-                  type="text"
-                  required
-                  placeholder="Ej: 15 Alitas + Papas"
-                  value={nombre}
-                  onChange={(e) => setNombre(e.target.value)}
-                  className="w-full px-3 py-2 bg-gray-900 border border-gray-800 rounded-lg text-white text-sm"
-                />
-              </div>
-
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-xs font-semibold text-gray-300 mb-1">Precio Venta (Bs)</label>
-                  <input
-                    type="number"
-                    step="0.50"
-                    required
-                    placeholder="50.00"
-                    value={precio}
-                    onChange={(e) => setPrecio(e.target.value)}
-                    className="w-full px-3 py-2 bg-gray-900 border border-gray-800 rounded-lg text-white text-sm"
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs font-semibold text-gray-300 mb-1">Costo Estimado (Bs)</label>
-                  <input
-                    type="number"
-                    step="0.50"
-                    placeholder="30.00"
-                    value={costo}
-                    onChange={(e) => setCosto(e.target.value)}
-                    className="w-full px-3 py-2 bg-gray-900 border border-gray-800 rounded-lg text-white text-sm"
-                  />
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-xs font-semibold text-gray-300 mb-1">Descripción / Detalles</label>
-                <textarea
-                  placeholder="Incluye papas y 1 salsa a elección..."
-                  value={descripcion}
-                  onChange={(e) => setDescripcion(e.target.value)}
-                  className="w-full px-3 py-2 bg-gray-900 border border-gray-800 rounded-lg text-white text-sm h-20"
-                />
-              </div>
-
-              <div className="flex gap-3 pt-2">
-                <button
-                  type="button"
-                  onClick={() => setModalAbierto(false)}
-                  className="w-1/2 bg-gray-800 hover:bg-gray-700 text-gray-300 py-2 rounded-lg text-sm font-semibold"
-                >
-                  Cancelar
-                </button>
-                <button
-                  type="submit"
-                  disabled={guardando}
-                  className="w-1/2 bg-mordiscos-orange hover:bg-orange-600 text-white font-bold py-2 rounded-lg text-sm shadow"
-                >
-                  {guardando ? 'Guardando...' : 'Guardar Producto'}
-                </button>
-              </div>
-            </form>
+        <form onSubmit={handleGuardarProducto} className="space-y-3">
+          <div>
+            <label className="text-xs text-gray-400 block mb-1">Nombre del Producto:</label>
+            <input
+              type="text"
+              required
+              value={nombre}
+              onChange={(e) => setNombre(e.target.value)}
+              className="w-full bg-gray-900 border border-gray-800 rounded-lg p-2 text-white text-xs"
+              placeholder="Ej: 12 Alitas + Papas"
+            />
           </div>
+
+          <div>
+            <label className="text-xs text-gray-400 block mb-1">Categoría:</label>
+            <select
+              value={categoriaId}
+              onChange={(e) => setCategoriaId(e.target.value)}
+              className="w-full bg-gray-900 border border-gray-800 rounded-lg p-2 text-white text-xs"
+            >
+              <option value="">Sin Categoría</option>
+              {categorias.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.nombre}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div>
+            <label className="text-xs text-gray-400 block mb-1">Precio (Bs):</label>
+            <input
+              type="number"
+              step="0.5"
+              required
+              value={precio}
+              onChange={(e) => setPrecio(e.target.value)}
+              className="w-full bg-gray-900 border border-gray-800 rounded-lg p-2 text-white text-xs"
+              placeholder="0.00"
+            />
+          </div>
+
+          <div>
+            <label className="text-xs text-gray-400 block mb-1">Descripción / Detalles:</label>
+            <textarea
+              value={descripcion}
+              onChange={(e) => setDescripcion(e.target.value)}
+              className="w-full bg-gray-900 border border-gray-800 rounded-lg p-2 text-white text-xs h-20"
+              placeholder="Ej: Incluye 2 salsas a elección..."
+            />
+          </div>
+
+          <div className="flex items-center gap-2 pt-1">
+            <input
+              type="checkbox"
+              id="disp"
+              checked={disponible}
+              onChange={(e) => setDisponible(e.target.checked)}
+              className="rounded bg-gray-900 border-gray-800 text-mordiscos-orange"
+            />
+            <label htmlFor="disp" className="text-xs text-gray-300">
+              Disponible para la venta
+            </label>
+          </div>
+
+          <button
+            type="submit"
+            disabled={guardando}
+            className="w-full bg-mordiscos-orange hover:bg-mordiscos-orange/90 text-white font-bold py-2.5 rounded-lg text-xs shadow-md disabled:opacity-50 mt-2"
+          >
+            {guardando ? 'Guardando...' : editandoId ? 'Actualizar Producto' : 'Guardar Producto'}
+          </button>
+        </form>
+      </div>
+
+      {/* Lista de Productos con Botones de Editar / Eliminar */}
+      <div className="lg:col-span-2 bg-mordiscos-card p-5 rounded-xl border border-gray-800">
+        <h2 className="text-base font-bold text-white border-b border-gray-800 pb-3 mb-4">
+          Catálogo Registrado ({productos.length})
+        </h2>
+
+        <div className="space-y-2 max-h-[calc(100vh-220px)] overflow-y-auto pr-1">
+          {productos.map((prod) => {
+            const catNombre = categorias.find((c) => c.id === prod.categoria_id)?.nombre || 'Sin Categ.'
+            return (
+              <div
+                key={prod.id}
+                className="flex justify-between items-center bg-gray-900/70 p-3 rounded-lg border border-gray-800 text-xs"
+              >
+                <div>
+                  <div className="flex items-center gap-2">
+                    <p className="font-bold text-white">{prod.nombre}</p>
+                    <span className="text-[10px] bg-gray-800 text-gray-400 px-2 py-0.5 rounded font-mono">
+                      {catNombre}
+                    </span>
+                  </div>
+                  {prod.descripcion && <p className="text-gray-400 text-[11px] mt-0.5">{prod.descripcion}</p>}
+                  <p className="text-mordiscos-accent font-extrabold mt-1">Bs {prod.precio.toFixed(2)}</p>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => iniciarEdicion(prod)}
+                    className="bg-blue-600/80 hover:bg-blue-500 text-white px-3 py-1.5 rounded text-[11px] font-bold"
+                  >
+                    ✏️ Editar
+                  </button>
+                  <button
+                    onClick={() => handleEliminarProducto(prod.id, prod.nombre)}
+                    className="bg-red-600/80 hover:bg-red-500 text-white px-3 py-1.5 rounded text-[11px] font-bold"
+                  >
+                    🗑️ Eliminar
+                  </button>
+                </div>
+              </div>
+            )
+          })}
         </div>
-      )}
+      </div>
     </div>
   )
 }

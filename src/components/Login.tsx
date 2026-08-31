@@ -46,7 +46,7 @@ export default function Login({ onLoginSuccess }: LoginProps) {
           />
           <div>
             <h1 className="text-3xl font-black text-mordiscos-orange tracking-wider">MORDISCOS</h1>
-            <p className="text-xs text-gray-400 font-medium mt-0.5">Wings-Restobar POS</p>
+            <p className="text-xs text-gray-400 font-semibold mt-0.5">Wings - Restobar</p>
           </div>
         </div>
 

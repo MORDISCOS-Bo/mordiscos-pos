@@ -73,7 +73,7 @@ export default function App() {
   return (
     <div className="min-h-screen bg-mordiscos-dark text-white p-4 sm:p-6">
       <header className="flex flex-col sm:flex-row justify-between items-center border-b border-gray-800 pb-4 mb-6 gap-4">
-        {/* LOGO EN EL HEADER */}
+        {/* LOGO EN EL HEADER Y SUBTÍTULO */}
         <div className="flex items-center gap-3">
           <img 
             src="/logo.png" 
@@ -87,7 +87,7 @@ export default function App() {
             <h1 className="text-2xl sm:text-3xl font-black text-mordiscos-orange tracking-wider">
               MORDISCOS
             </h1>
-            <p className="text-xs text-gray-400">Wings-Restobar POS</p>
+            <p className="text-xs text-gray-400 font-semibold">Wings - Restobar</p>
           </div>
         </div>
 
