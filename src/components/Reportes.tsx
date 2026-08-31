@@ -3,7 +3,7 @@ import { supabase } from '../lib/supabase'
 import type { Pedido } from '../types/database'
 
 // 🔑 CLAVE DE AUTORIZACIÓN PARA ELIMINAR/ANULAR VENTAS
-const CLAVE_ANULACION = '0101'
+const CLAVE_ANULACION = '1234'
 
 export default function Reportes() {
   const [pedidos, setPedidos] = useState<Pedido[]>([])
@@ -19,16 +19,26 @@ export default function Reportes() {
     setErrorMsj(null)
     
     try {
+      // Intentamos traer los pedidos. Eliminamos el order por 'created_at' para evitar el choque.
       const { data, error } = await supabase
         .from('pedidos')
         .select('*')
-        .order('created_at', { ascending: false })
 
       if (error) {
         console.error('Error Supabase:', error)
         setErrorMsj(error.message)
       } else if (data) {
-        setPedidos(data)
+        // Ordenamos los pedidos en el cliente por numero_pedido o por id
+        const datosOrdenados = [...data].sort((a, b) => {
+          if (a.numero_pedido && b.numero_pedido) {
+            return b.numero_pedido - a.numero_pedido
+          }
+          const fechaA = new Date(a.created_at || a.fecha || 0).getTime()
+          const fechaB = new Date(b.created_at || b.fecha || 0).getTime()
+          return fechaB - fechaA
+        })
+
+        setPedidos(datosOrdenados)
       }
     } catch (err: any) {
       console.error('Error general:', err)
@@ -93,7 +103,7 @@ export default function Reportes() {
 
       {errorMsj && (
         <div className="p-3 bg-red-900/40 border border-red-800 text-red-300 text-xs rounded-xl">
-          ⚠️ <strong>Error al cargar ventas:</strong> {errorMsj}. Si no aparece nada, revisa las políticas RLS en Supabase.
+          ⚠️ <strong>Error al cargar ventas:</strong> {errorMsj}
         </div>
       )}
 
@@ -134,7 +144,6 @@ export default function Reportes() {
                 <th className="py-3 px-4">Tipo / Mesa</th>
                 <th className="py-3 px-4">Cliente</th>
                 <th className="py-3 px-4">Estado</th>
-                <th className="py-3 px-4">Hora</th>
                 <th className="py-3 px-4 text-right">Total</th>
                 <th className="py-3 px-4 text-center">Acciones</th>
               </tr>
@@ -142,63 +151,56 @@ export default function Reportes() {
             <tbody className="divide-y divide-gray-800/60">
               {cargando ? (
                 <tr>
-                  <td colSpan={7} className="text-center py-6 text-gray-500">
+                  <td colSpan={6} className="text-center py-6 text-gray-500">
                     Cargando reportes...
                   </td>
                 </tr>
               ) : pedidos.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="text-center py-6 text-gray-500">
+                  <td colSpan={6} className="text-center py-6 text-gray-500">
                     No hay comisiones o registros de ventas.
                   </td>
                 </tr>
               ) : (
-                pedidos.map((p) => {
-                  const hora = p.created_at
-                    ? new Date(p.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-                    : '--:--'
-
-                  return (
-                    <tr key={p.id} className="hover:bg-gray-900/40 transition-colors">
-                      <td className="py-3 px-4 font-bold text-mordiscos-orange">
-                        #{p.numero_pedido || 'S/N'}
-                      </td>
-                      <td className="py-3 px-4 text-gray-200 capitalize">
-                        {p.tipo} {p.mesa ? `(${p.mesa})` : ''}
-                      </td>
-                      <td className="py-3 px-4 text-gray-300">
-                        {p.cliente_nombre || 'Cliente Mostrador'}
-                      </td>
-                      <td className="py-3 px-4">
-                        {p.estado === 'cancelado' ? (
-                          <span className="bg-red-900/50 text-red-400 border border-red-800/60 px-2 py-0.5 rounded font-bold text-[10px]">
-                            ANULADO
-                          </span>
-                        ) : (
-                          <span className="bg-emerald-900/50 text-emerald-400 border border-emerald-800/60 px-2 py-0.5 rounded font-bold text-[10px] uppercase">
-                            {p.estado || 'pendiente'}
-                          </span>
-                        )}
-                      </td>
-                      <td className="py-3 px-4 text-gray-400">{hora}</td>
-                      <td className="py-3 px-4 text-right font-extrabold text-mordiscos-orange">
-                        Bs {(p.total || 0).toFixed(2)}
-                      </td>
-                      <td className="py-3 px-4 text-center">
-                        {p.estado !== 'cancelado' ? (
-                          <button
-                            onClick={() => handleAnularPedido(p)}
-                            className="bg-red-600/80 hover:bg-red-600 text-white font-bold text-[10px] px-2.5 py-1 rounded transition-all shadow"
-                          >
-                            Anular
-                          </button>
-                        ) : (
-                          <span className="text-[10px] text-gray-600 italic">Anulado</span>
-                        )}
-                      </td>
-                    </tr>
-                  )
-                })
+                pedidos.map((p) => (
+                  <tr key={p.id} className="hover:bg-gray-900/40 transition-colors">
+                    <td className="py-3 px-4 font-bold text-mordiscos-orange">
+                      #{p.numero_pedido || 'S/N'}
+                    </td>
+                    <td className="py-3 px-4 text-gray-200 capitalize">
+                      {p.tipo} {p.mesa ? `(${p.mesa})` : ''}
+                    </td>
+                    <td className="py-3 px-4 text-gray-300">
+                      {p.cliente_nombre || 'Cliente Mostrador'}
+                    </td>
+                    <td className="py-3 px-4">
+                      {p.estado === 'cancelado' ? (
+                        <span className="bg-red-900/50 text-red-400 border border-red-800/60 px-2 py-0.5 rounded font-bold text-[10px]">
+                          ANULADO
+                        </span>
+                      ) : (
+                        <span className="bg-emerald-900/50 text-emerald-400 border border-emerald-800/60 px-2 py-0.5 rounded font-bold text-[10px] uppercase">
+                          {p.estado || 'pendiente'}
+                        </span>
+                      )}
+                    </td>
+                    <td className="py-3 px-4 text-right font-extrabold text-mordiscos-orange">
+                      Bs {(p.total || 0).toFixed(2)}
+                    </td>
+                    <td className="py-3 px-4 text-center">
+                      {p.estado !== 'cancelado' ? (
+                        <button
+                          onClick={() => handleAnularPedido(p)}
+                          className="bg-red-600/80 hover:bg-red-600 text-white font-bold text-[10px] px-2.5 py-1 rounded transition-all shadow"
+                        >
+                          Anular
+                        </button>
+                      ) : (
+                        <span className="text-[10px] text-gray-600 italic">Anulado</span>
+                      )}
+                    </td>
+                  </tr>
+                ))
               )}
             </tbody>
           </table>
