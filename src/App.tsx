@@ -1,170 +1,110 @@
-import { useEffect, useState } from 'react'
-import { supabase } from './lib/supabase'
-import Login from './components/Login'
-import GestionProductos from './components/GestionProductos'
+import { useState } from 'react'
 import PuntoVenta from './components/PuntoVenta'
-import CocinaKDS from './components/CocinaKDS'
-import Reportes from './components/Reportes'
 import ArqueoCaja from './components/ArqueoCaja'
-
-interface Perfil {
-  nombre: string
-  rol: string
-}
+import Reportes from './components/Reportes'
+// Si tienes los otros componentes creados, impórtalos aquí:
+// import Cocina from './components/Cocina'
+// import Productos from './components/Productos'
 
 export default function App() {
-  const [session, setSession] = useState<any>(null)
-  const [perfil, setPerfil] = useState<Perfil | null>(null)
-  const [cargando, setCargando] = useState(true)
-  const [vistaActual, setVistaActual] = useState<'pos' | 'productos' | 'cocina' | 'reportes' | 'arqueo'>('pos')
-
-  useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setSession(session)
-      if (session) obtenerPerfil(session.user.id)
-      else setCargando(false)
-    })
-
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      setSession(session)
-      if (session) obtenerPerfil(session.user.id)
-      else {
-        setPerfil(null)
-        setCargando(false)
-      }
-    })
-
-    return () => subscription.unsubscribe()
-  }, [])
-
-  const obtenerPerfil = async (userId: string) => {
-    try {
-      const { data, error } = await supabase
-        .from('perfiles')
-        .select('nombre, rol')
-        .eq('id', userId)
-        .single()
-
-      if (error) throw error
-      if (data) setPerfil(data)
-    } catch (err) {
-      console.error('Error cargando perfil:', err)
-    } finally {
-      setCargando(false)
-    }
-  }
-
-  const handleCerrarSesion = async () => {
-    await supabase.auth.signOut()
-  }
-
-  if (cargando) {
-    return (
-      <div className="min-h-screen bg-mordiscos-dark flex items-center justify-center text-white">
-        <p className="animate-pulse text-mordiscos-orange font-semibold">Cargando Mordiscos POS...</p>
-      </div>
-    )
-  }
-
-  if (!session) {
-    return <Login onLoginSuccess={() => {}} />
-  }
+  // Estado para controlar qué pestaña está activa
+  const [pestañaActiva, setPestañaActiva] = useState<
+    'venta' | 'cocina' | 'arqueo' | 'reportes' | 'productos'
+  >('venta')
 
   return (
-    <div className="min-h-screen bg-mordiscos-dark text-white p-4 sm:p-6">
-      <header className="flex flex-col sm:flex-row justify-between items-center border-b border-gray-800 pb-4 mb-6 gap-4">
-        {/* LOGO EN EL HEADER Y SUBTÍTULO */}
-        <div className="flex items-center gap-3">
-          <img 
-            src="/logo.png" 
-            alt="Mordiscos Logo" 
-            className="h-10 w-auto object-contain"
-            onError={(e) => {
-              e.currentTarget.style.display = 'none';
-            }}
-          />
-          <div>
-            <h1 className="text-2xl sm:text-3xl font-black text-mordiscos-orange tracking-wider">
-              MORDISCOS
+    <div className="min-h-screen bg-mordiscos-bg text-gray-100 flex flex-col font-sans">
+      {/* BARRA DE NAVEGACIÓN SUPERIOR */}
+      <header className="bg-mordiscos-card border-b border-gray-800 p-3 sticky top-0 z-50 shadow-md">
+        <div className="max-w-7xl mx-auto flex flex-wrap justify-between items-center gap-3">
+          
+          {/* Logo y Nombre */}
+          <div className="flex items-center gap-3">
+            <img src="/logo.png" alt="Mordiscos Logo" className="w-8 h-8 object-contain" />
+            <h1 className="font-black text-lg text-white tracking-wider">
+              MORDISCOS <span className="text-mordiscos-orange text-xs font-bold">POS</span>
             </h1>
-            <p className="text-xs text-gray-400 font-semibold">Wings - Restobar</p>
           </div>
-        </div>
 
-        {/* Selector de Pestañas */}
-        <div className="flex bg-gray-900 p-1 rounded-lg border border-gray-800 overflow-x-auto">
-          <button
-            onClick={() => setVistaActual('pos')}
-            className={`px-3 sm:px-4 py-1.5 rounded-md text-xs font-bold transition-all whitespace-nowrap ${
-              vistaActual === 'pos'
-                ? 'bg-mordiscos-orange text-white shadow'
-                : 'text-gray-400 hover:text-white'
-            }`}
-          >
-            🛒 Punto de Venta
-          </button>
-          <button
-            onClick={() => setVistaActual('cocina')}
-            className={`px-3 sm:px-4 py-1.5 rounded-md text-xs font-bold transition-all whitespace-nowrap ${
-              vistaActual === 'cocina'
-                ? 'bg-mordiscos-orange text-white shadow'
-                : 'text-gray-400 hover:text-white'
-            }`}
-          >
-            🍳 Cocina (KDS)
-          </button>
-          <button
-            onClick={() => setVistaActual('arqueo')}
-            className={`px-3 sm:px-4 py-1.5 rounded-md text-xs font-bold transition-all whitespace-nowrap ${
-              vistaActual === 'arqueo'
-                ? 'bg-mordiscos-orange text-white shadow'
-                : 'text-gray-400 hover:text-white'
-            }`}
-          >
-            💰 Arqueo de Caja
-          </button>
-          <button
-            onClick={() => setVistaActual('reportes')}
-            className={`px-3 sm:px-4 py-1.5 rounded-md text-xs font-bold transition-all whitespace-nowrap ${
-              vistaActual === 'reportes'
-                ? 'bg-mordiscos-orange text-white shadow'
-                : 'text-gray-400 hover:text-white'
-            }`}
-          >
-            📊 Reportes
-          </button>
-          <button
-            onClick={() => setVistaActual('productos')}
-            className={`px-3 sm:px-4 py-1.5 rounded-md text-xs font-bold transition-all whitespace-nowrap ${
-              vistaActual === 'productos'
-                ? 'bg-mordiscos-orange text-white shadow'
-                : 'text-gray-400 hover:text-white'
-            }`}
-          >
-            📋 Productos
-          </button>
-        </div>
+          {/* BOTONES DE NAVEGACIÓN */}
+          <nav className="flex items-center gap-1.5 bg-gray-900/80 p-1 rounded-xl border border-gray-800 text-xs">
+            <button
+              onClick={() => setPestañaActiva('venta')}
+              className={`px-3 py-1.5 rounded-lg font-bold transition-all flex items-center gap-1.5 ${
+                pestañaActiva === 'venta'
+                  ? 'bg-mordiscos-orange text-white shadow'
+                  : 'text-gray-400 hover:text-white'
+              }`}
+            >
+              🛒 Punto de Venta
+            </button>
 
-        <div className="flex items-center gap-4">
-          <div className="text-right hidden sm:block">
-            <p className="text-sm font-semibold">{perfil?.nombre || 'Usuario'}</p>
-            <p className="text-xs text-mordiscos-accent uppercase font-mono">{perfil?.rol || 'Rol'}</p>
-          </div>
-          <button
-            onClick={handleCerrarSesion}
-            className="bg-gray-800 hover:bg-red-900/50 text-gray-300 hover:text-red-300 px-3 py-1.5 rounded-lg text-xs font-semibold border border-gray-700 transition-colors"
-          >
-            Cerrar Sesión
-          </button>
+            <button
+              onClick={() => setPestañaActiva('cocina')}
+              className={`px-3 py-1.5 rounded-lg font-bold transition-all flex items-center gap-1.5 ${
+                pestañaActiva === 'cocina'
+                  ? 'bg-mordiscos-orange text-white shadow'
+                  : 'text-gray-400 hover:text-white'
+              }`}
+            >
+              🍳 Cocina (KDS)
+            </button>
+
+            <button
+              onClick={() => setPestañaActiva('arqueo')}
+              className={`px-3 py-1.5 rounded-lg font-bold transition-all flex items-center gap-1.5 ${
+                pestañaActiva === 'arqueo'
+                  ? 'bg-mordiscos-orange text-white shadow'
+                  : 'text-gray-400 hover:text-white'
+              }`}
+            >
+              💰 Arqueo de Caja
+            </button>
+
+            <button
+              onClick={() => setPestañaActiva('reportes')}
+              className={`px-3 py-1.5 rounded-lg font-bold transition-all flex items-center gap-1.5 ${
+                pestañaActiva === 'reportes'
+                  ? 'bg-mordiscos-orange text-white shadow'
+                  : 'text-gray-400 hover:text-white'
+              }`}
+            >
+              📊 Reportes
+            </button>
+
+            <button
+              onClick={() => setPestañaActiva('productos')}
+              className={`px-3 py-1.5 rounded-lg font-bold transition-all flex items-center gap-1.5 ${
+                pestañaActiva === 'productos'
+                  ? 'bg-mordiscos-orange text-white shadow'
+                  : 'text-gray-400 hover:text-white'
+              }`}
+            >
+              📋 Productos
+            </button>
+          </nav>
         </div>
       </header>
 
-      <main className="max-w-7xl mx-auto">
-        {vistaActual === 'pos' && <PuntoVenta />}
-        {vistaActual === 'cocina' && <CocinaKDS />}
-        {vistaActual === 'arqueo' && <ArqueoCaja />}
-        {vistaActual === 'reportes' && <Reportes />}
-        {vistaActual === 'productos' && <GestionProductos />}
+      {/* CONTENIDO PRINCIPAL SEGÚN LA PESTAÑA SELECCIONADA */}
+      <main className="flex-1 max-w-7xl w-full mx-auto p-4 md:p-6">
+        {pestañaActiva === 'venta' && <PuntoVenta />}
+        
+        {pestañaActiva === 'arqueo' && <ArqueoCaja />}
+        
+        {pestañaActiva === 'reportes' && <Reportes />}
+
+        {pestañaActiva === 'cocina' && (
+          <div className="text-center py-12 text-gray-500 font-bold">
+            🍳 Módulo de Cocina (KDS) en construcción...
+          </div>
+        )}
+
+        {pestañaActiva === 'productos' && (
+          <div className="text-center py-12 text-gray-500 font-bold">
+            📋 Módulo de Productos en construcción...
+          </div>
+        )}
       </main>
     </div>
   )
