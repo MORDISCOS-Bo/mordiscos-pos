@@ -1,429 +1,163 @@
 import { useEffect, useState } from 'react'
 import { supabase } from '../lib/supabase'
-import type { Categoria, Producto, ItemCarrito, Pedido } from '../types/database'
+import type { Pedido } from '../types/database'
 
-// 🔑 CLAVE DE AUTORIZACIÓN PARA ANULAR VENTAS
-const CLAVE_ANULACION = '1234'
-
-export default function PuntoVenta() {
-  const [categorias, setCategorias] = useState<Categoria[]>([])
-  const [productos, setProductos] = useState<Producto[]>([])
-  const [catSeleccionada, setCatSeleccionada] = useState<string>('todas')
-  
-  const [carrito, setCarrito] = useState<ItemCarrito[]>([])
-  const [tipoPedido, setTipoPedido] = useState<'mesa' | 'llevar' | 'delivery'>('mesa')
-  const [metodoPago, setMetodoPago] = useState<'efectivo' | 'qr' | 'tarjeta'>('efectivo')
-  const [mesa, setMesa] = useState('')
-  const [cliente, setCliente] = useState('')
-  const [enviando, setEnviando] = useState(false)
-
-  // Estado para las últimas ventas
-  const [ultimosPedidos, setUltimosPedidos] = useState<Pedido[]>([])
+export default function ArqueoCaja() {
+  const [montoInicial, setMontoInicial] = useState<number>(0)
+  const [pedidos, setPedidos] = useState<Pedido[]>([])
+  const [cargando, setCargando] = useState(true)
+  const [guardando, setGuardando] = useState(false)
 
   useEffect(() => {
-    cargarCatalogo()
-    cargarUltimosPedidos()
+    cargarVentas()
   }, [])
 
-  const cargarCatalogo = async () => {
-    const { data: catData } = await supabase.from('categorias').select('*').order('nombre')
-    if (catData) setCategorias(catData)
+  const cargarVentas = async () => {
+    setCargando(true)
+    try {
+      // Traemos los pedidos de Supabase
+      const { data, error } = await supabase
+        .from('pedidos')
+        .select('*')
 
-    const { data: prodData } = await supabase.from('productos').select('*').eq('disponible', true).order('nombre')
-    if (prodData) setProductos(prodData)
-  }
-
-  const cargarUltimosPedidos = async () => {
-    const { data } = await supabase
-      .from('pedidos')
-      .select('*')
-      .order('id', { ascending: false })
-      .limit(10)
-
-    if (data) setUltimosPedidos(data)
-  }
-
-  const agregarAlCarrito = (producto: Producto) => {
-    setCarrito((prev) => {
-      const existe = prev.find((item) => item.producto.id === producto.id)
-      if (existe) {
-        return prev.map((item) =>
-          item.producto.id === producto.id ? { ...item, cantidad: item.cantidad + 1 } : item
-        )
+      if (error) {
+        console.error('Error al cargar pedidos para arqueo:', error)
+      } else if (data) {
+        setPedidos(data)
       }
-      return [...prev, { producto, cantidad: 1 }]
-    })
+    } catch (err) {
+      console.error('Error:', err)
+    } finally {
+      setCargando(false)
+    }
   }
 
-  const modificarCantidad = (id: string, delta: number) => {
-    setCarrito((prev) =>
-      prev
-        .map((item) => {
-          if (item.producto.id === id) {
-            const nuevaCantidad = item.cantidad + delta
-            return nuevaCantidad > 0 ? { ...item, cantidad: nuevaCantidad } : null
-          }
-          return item
-        })
-        .filter(Boolean) as ItemCarrito[]
-    )
-  }
+  // ⚠️ CRUCIAL: Excluir explícitamente las ventas anuladas / canceladas
+  const pedidosValidos = pedidos.filter((p) => p.estado !== 'cancelado')
 
-  const totalPedido = carrito.reduce((acc, item) => acc + item.producto.precio * item.cantidad, 0)
+  // Desglose por método de pago solo con pedidos válidos
+  const ventasEfectivo = pedidosValidos
+    .filter((p) => p.metodo_pago === 'efectivo')
+    .reduce((acc, p) => acc + (p.total || 0), 0)
 
-  // CREAR PEDIDO REINICIANDO NÚMERO SEGÚN EL ÚLTIMO ARQUEO DE CAJA
-  const handleCrearPedido = async () => {
-    if (carrito.length === 0) return alert('El carrito está vacío.')
-    if (tipoPedido === 'mesa' && !mesa) return alert('Por favor ingresa el número o nombre de mesa.')
+  const ventasQR = pedidosValidos
+    .filter((p) => p.metodo_pago === 'qr')
+    .reduce((acc, p) => acc + (p.total || 0), 0)
 
-    setEnviando(true)
+  const ventasTarjeta = pedidosValidos
+    .filter((p) => p.metodo_pago === 'tarjeta')
+    .reduce((acc, p) => acc + (p.total || 0), 0)
+
+  const totalVentas = ventasEfectivo + ventasQR + ventasTarjeta
+  const totalEfectivoEsperado = montoInicial + ventasEfectivo
+
+  const handleGuardarCierre = async () => {
+    setGuardando(true)
     try {
       const user = (await supabase.auth.getUser()).data.user
 
-      // 1. Obtener la fecha del último cierre de caja
-      const { data: ultimoArqueo } = await supabase
-        .from('arqueo_caja')
-        .select('created_at')
-        .order('created_at', { ascending: false })
-        .limit(1)
-        .maybeSingle()
-
-      const fechaUltimoCierre = ultimoArqueo?.created_at || null
-
-      // 2. Contar cuántos pedidos existen DESPUÉS del último cierre
-      let queryPedidos = supabase
-        .from('pedidos')
-        .select('id', { count: 'exact', head: true })
-
-      if (fechaUltimoCierre) {
-        queryPedidos = queryPedidos.gt('created_at', fechaUltimoCierre)
-      }
-
-      const { count } = await queryPedidos
-      const nuevoNumeroPedido = (count || 0) + 1
-
-      // 3. Crear el pedido con el nuevo número correlativo
-      const { data: pedidoGuardado, error: errPedido } = await supabase
-        .from('pedidos')
-        .insert([
-          {
-            numero_pedido: nuevoNumeroPedido,
-            tipo: tipoPedido,
-            mesa: tipoPedido === 'mesa' ? mesa : null,
-            cliente_nombre: cliente || 'Cliente Mostrador',
-            total: totalPedido,
-            metodo_pago: metodoPago,
-            estado: 'pendiente',
-            usuario_id: user?.id,
-          },
-        ])
-        .select()
-        .single()
-
-      if (errPedido) throw errPedido
-
-      const detalles = carrito.map((item) => ({
-        pedido_id: pedidoGuardado.id,
-        producto_id: item.producto.id,
-        cantidad: item.cantidad,
-        precio_unitario: item.producto.precio,
-        subtotal: item.producto.precio * item.cantidad,
-      }))
-
-      const { error: errDetalles } = await supabase.from('pedido_detalles').insert(detalles)
-      if (errDetalles) throw errDetalles
-
-      alert(`¡Pedido #${pedidoGuardado.numero_pedido} registrado exitosamente! 🍗`)
-      
-      setCarrito([])
-      setMesa('')
-      setCliente('')
-      cargarUltimosPedidos()
-    } catch (err: any) {
-      alert('Error enviando el pedido: ' + err.message)
-    } finally {
-      setEnviando(false)
-    }
-  }
-
-  // ANULAR VENTA CON CONTRASEÑA
-  const handleAnularPedido = async (pedido: Pedido) => {
-    const clave = prompt(`Ingresa la contraseña de autorización para anular el pedido #${pedido.numero_pedido || ''}:`)
-
-    if (clave === null) return
-
-    if (clave !== CLAVE_ANULACION) {
-      alert('❌ Contraseña incorrecta. No tienes permisos para anular ventas.')
-      return
-    }
-
-    try {
-      const { error } = await supabase
-        .from('pedidos')
-        .update({ estado: 'cancelado' })
-        .eq('id', pedido.id)
+      const { error } = await supabase.from('arqueo_caja').insert([
+        {
+          monto_inicial: montoInicial,
+          ventas_efectivo: ventasEfectivo,
+          ventas_qr: ventasQR,
+          ventas_tarjeta: ventasTarjeta,
+          total_ventas: totalVentas,
+          total_efectivo_esperado: totalEfectivoEsperado,
+          usuario_id: user?.id,
+        },
+      ])
 
       if (error) throw error
 
-      alert(`✅ Venta #${pedido.numero_pedido || ''} anulada correctamente.`)
-      cargarUltimosPedidos()
+      alert('✅ ¡Cierre de caja registrado exitosamente!')
     } catch (err: any) {
-      alert('Error al anular la venta: ' + err.message)
+      alert('Error al guardar el cierre de caja: ' + err.message)
+    } finally {
+      setGuardando(false)
     }
   }
 
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 relative">
-      {/* SECCIÓN IZQUIERDA: Catálogo y Últimas Ventas */}
-      <div className="lg:col-span-2 space-y-6 relative min-h-[500px]">
-        
-        {/* LOGO MARCA DE AGUA GIGANTE CENTRADO */}
-        <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-0 opacity-15 overflow-hidden">
-          <img 
-            src="/logo.png" 
-            alt="Marca de Agua Mordiscos" 
-            className="w-full max-w-xl md:max-w-2xl object-contain filter drop-shadow-lg" 
-          />
+    <div className="space-y-6">
+      <div className="flex justify-between items-center">
+        <div>
+          <h2 className="text-xl font-bold text-white flex items-center gap-2">
+            💰 Arqueo y Cierre de Caja
+          </h2>
+          <p className="text-xs text-gray-400">Control de flujo de dinero del día</p>
         </div>
-
-        {/* Categorías */}
-        <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-thin relative z-10">
-          <button
-            onClick={() => setCatSeleccionada('todas')}
-            className={`px-4 py-2 rounded-lg text-xs font-bold whitespace-nowrap transition-colors ${
-              catSeleccionada === 'todas'
-                ? 'bg-mordiscos-orange text-white'
-                : 'bg-mordiscos-card text-gray-400 border border-gray-800'
-            }`}
-          >
-            Todas
-          </button>
-          {categorias.map((c) => (
-            <button
-              key={c.id}
-              onClick={() => setCatSeleccionada(c.id)}
-              className={`px-4 py-2 rounded-lg text-xs font-bold whitespace-nowrap transition-colors ${
-                catSeleccionada === c.id
-                  ? 'bg-mordiscos-orange text-white'
-                  : 'bg-mordiscos-card text-gray-400 border border-gray-800'
-              }`}
-            >
-              {c.nombre}
-            </button>
-          ))}
-        </div>
-
-        {/* Productos */}
-        <div className="space-y-6 relative z-10">
-          {catSeleccionada === 'todas' ? (
-            categorias.map((cat) => {
-              const prodsCat = productos.filter((p) => p.categoria_id === cat.id)
-              if (prodsCat.length === 0) return null
-
-              return (
-                <div key={cat.id} className="space-y-2">
-                  <h3 className="text-xs font-bold text-mordiscos-orange uppercase tracking-wider border-b border-gray-800/80 pb-1">
-                    {cat.nombre}
-                  </h3>
-                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-                    {prodsCat.map((prod) => (
-                      <button
-                        key={prod.id}
-                        onClick={() => agregarAlCarrito(prod)}
-                        className="bg-mordiscos-card/80 backdrop-blur-md hover:border-mordiscos-orange p-3 rounded-xl border border-gray-800/90 text-left transition-all flex flex-col justify-between h-28 shadow-md hover:scale-[1.02]"
-                      >
-                        <div>
-                          <p className="font-bold text-white text-sm line-clamp-2">{prod.nombre}</p>
-                          {prod.descripcion && (
-                            <p className="text-[10px] text-gray-400 line-clamp-1 mt-1">{prod.descripcion}</p>
-                          )}
-                        </div>
-                        <p className="text-mordiscos-accent font-extrabold text-sm">Bs {prod.precio.toFixed(2)}</p>
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              )
-            })
-          ) : (
-            <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-              {productos
-                .filter((p) => p.categoria_id === catSeleccionada)
-                .map((prod) => (
-                  <button
-                    key={prod.id}
-                    onClick={() => agregarAlCarrito(prod)}
-                    className="bg-mordiscos-card/80 backdrop-blur-md hover:border-mordiscos-orange p-3 rounded-xl border border-gray-800/90 text-left transition-all flex flex-col justify-between h-28 shadow-md hover:scale-[1.02]"
-                  >
-                    <div>
-                      <p className="font-bold text-white text-sm line-clamp-2">{prod.nombre}</p>
-                      {prod.descripcion && (
-                        <p className="text-[10px] text-gray-400 line-clamp-1 mt-1">{prod.descripcion}</p>
-                      )}
-                    </div>
-                    <p className="text-mordiscos-accent font-extrabold text-sm">Bs {prod.precio.toFixed(2)}</p>
-                  </button>
-                ))}
-            </div>
-          )}
-        </div>
-
-        {/* Últimas Ventas */}
-        <div className="relative z-10 pt-6 border-t border-gray-800">
-          <h3 className="text-sm font-bold text-gray-300 mb-3 flex items-center justify-between">
-            <span>Últimas Ventas Realizadas</span>
-            <span className="text-[10px] font-normal text-gray-500">(Para corregir errores)</span>
-          </h3>
-
-          <div className="space-y-2">
-            {ultimosPedidos.length === 0 ? (
-              <p className="text-xs text-gray-500">No hay ventas recientes.</p>
-            ) : (
-              ultimosPedidos.map((ped) => (
-                <div
-                  key={ped.id}
-                  className="flex items-center justify-between p-2.5 bg-mordiscos-card/90 backdrop-blur-sm rounded-lg border border-gray-800/80 text-xs"
-                >
-                  <div>
-                    <span className="font-bold text-white">#{ped.numero_pedido || 'S/N'}</span>
-                    <span className="text-gray-400 ml-2 capitalize">({ped.tipo})</span>
-                    <span className="text-mordiscos-accent font-bold ml-3">Bs {ped.total.toFixed(2)}</span>
-                  </div>
-
-                  {ped.estado === 'cancelado' ? (
-                    <span className="text-[10px] bg-red-900/50 text-red-400 border border-red-800/50 px-2 py-0.5 rounded font-bold">
-                      ANULADO
-                    </span>
-                  ) : (
-                    <button
-                      onClick={() => handleAnularPedido(ped)}
-                      className="bg-red-600/80 hover:bg-red-600 text-white text-[10px] px-2.5 py-1 rounded font-bold transition-all"
-                    >
-                      Anular Venta
-                    </button>
-                  )}
-                </div>
-              ))
-            )}
-          </div>
-        </div>
-
       </div>
 
-      {/* SECCIÓN DERECHA: Comanda / Carrito */}
-      <div className="bg-mordiscos-card p-5 rounded-xl border border-gray-800 flex flex-col justify-between h-[calc(100vh-140px)] sticky top-4 z-10">
-        <div>
-          <h3 className="text-lg font-bold text-mordiscos-orange border-b border-gray-800 pb-3 mb-4">
-            Comanda Actual
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        {/* 1. FONDO DE CAJA */}
+        <div className="bg-mordiscos-card p-5 rounded-xl border border-gray-800 space-y-4">
+          <h3 className="text-sm font-bold text-mordiscos-orange uppercase tracking-wider">
+            1. FONDO DE CAJA
+          </h3>
+          <div>
+            <label className="text-xs text-gray-300 block mb-2 font-medium">
+              Monto Inicial en Efectivo (Bs):
+            </label>
+            <input
+              type="number"
+              value={montoInicial || ''}
+              onChange={(e) => setMontoInicial(Number(e.target.value))}
+              placeholder="0"
+              className="w-full bg-gray-900 border border-gray-800 rounded-lg p-3 text-white font-bold text-lg focus:outline-none focus:border-mordiscos-orange"
+            />
+          </div>
+        </div>
+
+        {/* 2. DESGLOSE DE VENTAS */}
+        <div className="bg-mordiscos-card p-5 rounded-xl border border-gray-800 space-y-4">
+          <h3 className="text-sm font-bold text-mordiscos-orange uppercase tracking-wider">
+            2. DESGLOSE DE VENTAS
           </h3>
 
-          <div className="space-y-3 mb-4">
-            <div className="flex gap-2">
-              {(['mesa', 'llevar', 'delivery'] as const).map((t) => (
-                <button
-                  key={t}
-                  onClick={() => setTipoPedido(t)}
-                  className={`flex-1 py-1.5 rounded-lg text-xs font-bold capitalize transition-colors ${
-                    tipoPedido === t
-                      ? 'bg-mordiscos-red text-white'
-                      : 'bg-gray-900 text-gray-400 border border-gray-800'
-                  }`}
-                >
-                  {t}
-                </button>
-              ))}
+          <div className="space-y-3 text-xs">
+            <div className="flex justify-between items-center py-1 border-b border-gray-800/60">
+              <span className="text-gray-300 flex items-center gap-2">💵 Ventas Efectivo:</span>
+              <span className="font-extrabold text-white text-sm">Bs {ventasEfectivo.toFixed(2)}</span>
             </div>
 
-            <div className="grid grid-cols-2 gap-2">
-              {tipoPedido === 'mesa' && (
-                <input
-                  type="text"
-                  placeholder="N° Mesa (Ej: M3)"
-                  value={mesa}
-                  onChange={(e) => setMesa(e.target.value)}
-                  className="px-3 py-1.5 bg-gray-900 border border-gray-800 rounded-lg text-white text-xs"
-                />
-              )}
-              <input
-                type="text"
-                placeholder="Cliente (Opcional)"
-                value={cliente}
-                onChange={(e) => setCliente(e.target.value)}
-                className={`px-3 py-1.5 bg-gray-900 border border-gray-800 rounded-lg text-white text-xs ${
-                  tipoPedido !== 'mesa' ? 'col-span-2' : ''
-                }`}
-              />
+            <div className="flex justify-between items-center py-1 border-b border-gray-800/60">
+              <span className="text-gray-300 flex items-center gap-2">📱 Ventas QR:</span>
+              <span className="font-extrabold text-white text-sm">Bs {ventasQR.toFixed(2)}</span>
             </div>
 
-            <div className="pt-2">
-              <label className="text-[10px] text-gray-400 uppercase font-semibold block mb-1">Método de Pago:</label>
-              <div className="grid grid-cols-3 gap-1.5">
-                {(['efectivo', 'qr', 'tarjeta'] as const).map((m) => (
-                  <button
-                    key={m}
-                    onClick={() => setMetodoPago(m)}
-                    className={`py-1 rounded text-[11px] font-bold uppercase border transition-all ${
-                      metodoPago === m
-                        ? 'bg-mordiscos-orange text-white border-mordiscos-orange'
-                        : 'bg-gray-900 text-gray-400 border-gray-800'
-                    }`}
-                  >
-                    {m}
-                  </button>
-                ))}
-              </div>
+            <div className="flex justify-between items-center py-1 border-b border-gray-800/60">
+              <span className="text-gray-300 flex items-center gap-2">💳 Ventas Tarjeta:</span>
+              <span className="font-extrabold text-white text-sm">Bs {ventasTarjeta.toFixed(2)}</span>
             </div>
-          </div>
 
-          <div className="space-y-2 max-h-52 overflow-y-auto pr-1">
-            {carrito.length === 0 ? (
-              <p className="text-xs text-gray-500 text-center py-8">Selecciona productos de la izquierda</p>
-            ) : (
-              carrito.map((item) => (
-                <div
-                  key={item.producto.id}
-                  className="flex justify-between items-center p-2 bg-gray-900/60 rounded-lg border border-gray-800/80 text-xs"
-                >
-                  <div className="flex-1 pr-2">
-                    <p className="font-semibold text-white">{item.producto.nombre}</p>
-                    <p className="text-gray-400">Bs {item.producto.precio.toFixed(2)}</p>
-                  </div>
-
-                  <div className="flex items-center gap-2">
-                    <button
-                      onClick={() => modificarCantidad(item.producto.id, -1)}
-                      className="w-6 h-6 bg-gray-800 hover:bg-gray-700 rounded font-bold text-white flex items-center justify-center"
-                    >
-                      -
-                    </button>
-                    <span className="font-mono text-white font-bold">{item.cantidad}</span>
-                    <button
-                      onClick={() => modificarCantidad(item.producto.id, 1)}
-                      className="w-6 h-6 bg-gray-800 hover:bg-gray-700 rounded font-bold text-white flex items-center justify-center"
-                    >
-                      +
-                    </button>
-                  </div>
-                </div>
-              ))
-            )}
+            <div className="flex justify-between items-center pt-2 font-bold text-sm">
+              <span className="text-mordiscos-orange">Total Ventas:</span>
+              <span className="text-mordiscos-orange text-base font-black">Bs {totalVentas.toFixed(2)}</span>
+            </div>
           </div>
         </div>
+      </div>
 
-        <div className="border-t border-gray-800 pt-4 mt-4 space-y-3">
-          <div className="flex justify-between text-base font-extrabold text-white">
-            <span>Total:</span>
-            <span className="text-mordiscos-accent">Bs {totalPedido.toFixed(2)}</span>
-          </div>
-
-          <button
-            onClick={handleCrearPedido}
-            disabled={enviando || carrito.length === 0}
-            className="w-full bg-gradient-to-r from-mordiscos-red to-mordiscos-orange hover:opacity-90 text-white font-bold py-3 rounded-lg text-sm shadow-lg disabled:opacity-40 transition-all"
-          >
-            {enviando ? 'Enviando Pedido...' : 'Confirmar y Enviar Pedido'}
-          </button>
+      {/* TOTAL ESPERADO */}
+      <div className="bg-mordiscos-card p-6 rounded-xl border border-gray-800 text-center space-y-4">
+        <div>
+          <p className="text-xs font-bold text-gray-400 uppercase tracking-widest">
+            TOTAL EFECTIVO FÍSICO ESPERADO EN CAJA
+          </p>
+          <p className="text-3xl font-black text-emerald-400 mt-2">
+            Bs {totalEfectivoEsperado.toFixed(2)}
+          </p>
+          <p className="text-[11px] text-gray-500 mt-1">(Monto Inicial + Ventas en Efectivo)</p>
         </div>
+
+        <button
+          onClick={handleGuardarCierre}
+          disabled={guardando || cargando}
+          className="bg-mordiscos-orange hover:opacity-90 text-white font-bold px-6 py-3 rounded-xl text-sm transition-all shadow-lg disabled:opacity-50"
+        >
+          {guardando ? 'Guardando Cierre...' : '🔒 Confirmar y Guardar Cierre de Caja'}
+        </button>
       </div>
     </div>
   )
