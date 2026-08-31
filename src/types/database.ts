@@ -24,13 +24,14 @@ export interface ItemCarrito {
 }
 
 export interface Pedido {
-  id?: string
+  id: string
   numero_pedido?: number
   tipo: 'mesa' | 'llevar' | 'delivery'
-  mesa?: string
-  cliente_nombre?: string
-  estado?: string
+  mesa?: string | null
+  cliente_nombre?: string | null
   total: number
+  metodo_pago: 'efectivo' | 'qr' | 'tarjeta'
+  estado: 'pendiente' | 'en_preparacion' | 'completado' | 'cancelado' // <-- Asegúrate de incluir 'cancelado'
+  created_at?: string
   usuario_id?: string
-  creado_en?: string
 }

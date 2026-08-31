@@ -1,6 +1,9 @@
 import { useEffect, useState } from 'react'
 import { supabase } from '../lib/supabase'
-import type { Categoria, Producto, ItemCarrito } from '../types/database'
+import type { Categoria, Producto, ItemCarrito, Pedido } from '../types/database'
+
+// 🔑 CAMBIA AQUÍ TU CONTRASEÑA PARA ANULAR VENTAS
+const CLAVE_ANULACION = '0101'
 
 export default function PuntoVenta() {
   const [categorias, setCategorias] = useState<Categoria[]>([])
@@ -14,8 +17,12 @@ export default function PuntoVenta() {
   const [cliente, setCliente] = useState('')
   const [enviando, setEnviando] = useState(false)
 
+  // Estado para las últimas ventas
+  const [ultimosPedidos, setUltimosPedidos] = useState<Pedido[]>([])
+
   useEffect(() => {
     cargarCatalogo()
+    cargarUltimosPedidos()
   }, [])
 
   const cargarCatalogo = async () => {
@@ -24,6 +31,16 @@ export default function PuntoVenta() {
 
     const { data: prodData } = await supabase.from('productos').select('*').eq('disponible', true).order('nombre')
     if (prodData) setProductos(prodData)
+  }
+
+  const cargarUltimosPedidos = async () => {
+    const { data } = await supabase
+      .from('pedidos')
+      .select('*')
+      .order('created_at', { ascending: false })
+      .limit(10)
+
+    if (data) setUltimosPedidos(data)
   }
 
   const agregarAlCarrito = (producto: Producto) => {
@@ -91,11 +108,12 @@ export default function PuntoVenta() {
       const { error: errDetalles } = await supabase.from('pedido_detalles').insert(detalles)
       if (errDetalles) throw errDetalles
 
-      alert(`¡Pedido #${pedidoGuardado.numero_pedido} enviado exitosamente! 🍗`)
+      alert(`¡Pedido #${pedidoGuardado.numero_pedido || ''} registrado exitosamente! 🍗`)
       
       setCarrito([])
       setMesa('')
       setCliente('')
+      cargarUltimosPedidos()
     } catch (err: any) {
       alert('Error enviando el pedido: ' + err.message)
     } finally {
@@ -103,13 +121,44 @@ export default function PuntoVenta() {
     }
   }
 
+  // FUNCIÓN PARA ANULAR VENTA CON CONTRASEÑA
+  const handleAnularPedido = async (pedido: Pedido) => {
+    const clave = prompt(`Ingresa la contraseña de autorización para anular el pedido #${pedido.numero_pedido || ''}:`)
+
+    if (clave === null) return // Cancelado por el usuario
+
+    if (clave !== CLAVE_ANULACION) {
+      alert('❌ Contraseña incorrecta. No tienes permisos para anular ventas.')
+      return
+    }
+
+    try {
+      const { error } = await supabase
+        .from('pedidos')
+        .update({ estado: 'cancelado' })
+        .eq('id', pedido.id)
+
+      if (error) throw error
+
+      alert(`✅ Venta #${pedido.numero_pedido || ''} anulada correctamente.`)
+      cargarUltimosPedidos()
+    } catch (err: any) {
+      alert('Error al anular la venta: ' + err.message)
+    }
+  }
+
   return (
     <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 relative">
-      {/* SECCIÓN IZQUIERDA: Catálogo de Productos */}
-      <div className="lg:col-span-2 space-y-4 relative">
-        {/* LOGO MARCA DE AGUA SEMITRANSPARENTE EN EL CENTRO */}
-        <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-0 opacity-10">
-          <img src="/logo.png" alt="Marca de Agua" className="max-w-xs md:max-w-md object-contain" />
+      {/* SECCIÓN IZQUIERDA: Catálogo de Productos y Últimas Ventas */}
+      <div className="lg:col-span-2 space-y-6 relative min-h-[500px]">
+        
+        {/* LOGO MARCA DE AGUA GIGANTE Y CENTRADO EN EL FONDO */}
+        <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-0 opacity-15 overflow-hidden">
+          <img 
+            src="/logo.png" 
+            alt="Marca de Agua Mordiscos" 
+            className="w-full max-w-xl md:max-w-2xl object-contain filter drop-shadow-lg" 
+          />
         </div>
 
         {/* Filtro por Categorías */}
@@ -139,7 +188,7 @@ export default function PuntoVenta() {
           ))}
         </div>
 
-        {/* LISTADO DE PRODUCTOS EN MODO "TODAS" (SEPARADOS POR CATEGORÍA) O MODO FILTRADO */}
+        {/* LISTADO DE PRODUCTOS EN MODO "TODAS" O MODO FILTRADO */}
         <div className="space-y-6 relative z-10">
           {catSeleccionada === 'todas' ? (
             categorias.map((cat) => {
@@ -156,7 +205,7 @@ export default function PuntoVenta() {
                       <button
                         key={prod.id}
                         onClick={() => agregarAlCarrito(prod)}
-                        className="bg-mordiscos-card/90 backdrop-blur-sm hover:border-mordiscos-orange p-3 rounded-xl border border-gray-800 text-left transition-all flex flex-col justify-between h-28 shadow-md hover:scale-[1.02]"
+                        className="bg-mordiscos-card/80 backdrop-blur-md hover:border-mordiscos-orange p-3 rounded-xl border border-gray-800/90 text-left transition-all flex flex-col justify-between h-28 shadow-md hover:scale-[1.02]"
                       >
                         <div>
                           <p className="font-bold text-white text-sm line-clamp-2">{prod.nombre}</p>
@@ -179,7 +228,7 @@ export default function PuntoVenta() {
                   <button
                     key={prod.id}
                     onClick={() => agregarAlCarrito(prod)}
-                    className="bg-mordiscos-card/90 backdrop-blur-sm hover:border-mordiscos-orange p-3 rounded-xl border border-gray-800 text-left transition-all flex flex-col justify-between h-28 shadow-md hover:scale-[1.02]"
+                    className="bg-mordiscos-card/80 backdrop-blur-md hover:border-mordiscos-orange p-3 rounded-xl border border-gray-800/90 text-left transition-all flex flex-col justify-between h-28 shadow-md hover:scale-[1.02]"
                   >
                     <div>
                       <p className="font-bold text-white text-sm line-clamp-2">{prod.nombre}</p>
@@ -193,6 +242,47 @@ export default function PuntoVenta() {
             </div>
           )}
         </div>
+
+        {/* SECCIÓN DE ÚLTIMAS VENTAS PARA ANULAR SI HUBO UN ERROR */}
+        <div className="relative z-10 pt-6 border-t border-gray-800">
+          <h3 className="text-sm font-bold text-gray-300 mb-3 flex items-center justify-between">
+            <span>Últimas Ventas Realizadas</span>
+            <span className="text-[10px] font-normal text-gray-500">(Para corregir errores)</span>
+          </h3>
+
+          <div className="space-y-2">
+            {ultimosPedidos.length === 0 ? (
+              <p className="text-xs text-gray-500">No hay ventas recientes.</p>
+            ) : (
+              ultimosPedidos.map((ped) => (
+                <div
+                  key={ped.id}
+                  className="flex items-center justify-between p-2.5 bg-mordiscos-card/90 backdrop-blur-sm rounded-lg border border-gray-800/80 text-xs"
+                >
+                  <div>
+                    <span className="font-bold text-white">#{ped.numero_pedido || 'S/N'}</span>
+                    <span className="text-gray-400 ml-2 capitalize">({ped.tipo})</span>
+                    <span className="text-mordiscos-accent font-bold ml-3">Bs {ped.total.toFixed(2)}</span>
+                  </div>
+
+                  {ped.estado === 'cancelado' ? (
+                    <span className="text-[10px] bg-red-900/50 text-red-400 border border-red-800/50 px-2 py-0.5 rounded font-bold">
+                      ANULADO
+                    </span>
+                  ) : (
+                    <button
+                      onClick={() => handleAnularPedido(ped)}
+                      className="bg-red-600/80 hover:bg-red-600 text-white text-[10px] px-2.5 py-1 rounded font-bold transition-all"
+                    >
+                      Anular Venta
+                    </button>
+                  )}
+                </div>
+              ))
+            )}
+          </div>
+        </div>
+
       </div>
 
       {/* SECCIÓN DERECHA: Comanda / Carrito */}
