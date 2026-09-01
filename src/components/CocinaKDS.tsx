@@ -16,7 +16,7 @@ interface PedidoCocina {
   mesa: string | null
   cliente_nombre: string
   estado: string
-  created_at: string
+  created_at?: string
   pedido_detalles: DetallePedido[]
 }
 
@@ -27,7 +27,6 @@ export default function Cocina() {
   useEffect(() => {
     cargarPedidosCocina()
 
-    // Suscripción en tiempo real para cambios en pedidos y detalles
     const channel = supabase
       .channel('cambios-cocina-realtime')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'pedidos' }, () => {
@@ -55,7 +54,6 @@ export default function Cocina() {
           mesa,
           cliente_nombre,
           estado,
-          created_at,
           pedido_detalles (
             id,
             cantidad,
@@ -65,7 +63,7 @@ export default function Cocina() {
           )
         `)
         .in('estado', ['pendiente', 'en_preparacion'])
-        .order('created_at', { ascending: true })
+        .order('id', { ascending: true })
 
       if (error) {
         console.error('Error cargando comanda:', error)

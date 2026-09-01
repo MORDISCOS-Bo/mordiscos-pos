@@ -30,11 +30,17 @@ export default function PuntoVenta() {
   }
 
   const cargarUltimosPedidos = async () => {
-    const { data } = await supabase
+    // Ordenamos por id descendente de forma simple
+    const { data, error } = await supabase
       .from('pedidos')
       .select('*')
-      .order('created_at', { ascending: false })
+      .order('id', { ascending: false })
       .limit(10)
+
+    if (error) {
+      console.error('Error al cargar últimos pedidos:', error)
+      return
+    }
 
     if (data) setUltimosPedidos(data)
   }
@@ -75,15 +81,17 @@ export default function PuntoVenta() {
     try {
       const user = (await supabase.auth.getUser()).data.user
 
-      // Obtener el último número de pedido registrado hoy para incrementar correlativo
-      const { data: ultimoPedidoRegistrado } = await supabase
+      // Obtener el número máximo registrado en la base de datos
+      const { data: ultimos, error: errNum } = await supabase
         .from('pedidos')
         .select('numero_pedido')
-        .order('created_at', { ascending: false })
+        .order('numero_pedido', { ascending: false })
         .limit(1)
-        .maybeSingle()
 
-      const nuevoNumeroPedido = (ultimoPedidoRegistrado?.numero_pedido || 0) + 1
+      if (errNum) console.warn('Aviso leyendo número anterior:', errNum)
+
+      const ultimoNumero = ultimos && ultimos.length > 0 ? (ultimos[0].numero_pedido || 0) : 0
+      const nuevoNumeroPedido = Number(ultimoNumero) + 1
 
       const { data: pedidoGuardado, error: errPedido } = await supabase
         .from('pedidos')
