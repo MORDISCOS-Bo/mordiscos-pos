@@ -2,7 +2,7 @@ import { useState } from 'react'
 import PuntoVenta from './components/PuntoVenta'
 import ArqueoCaja from './components/ArqueoCaja'
 import Reportes from './components/Reportes'
-import Cocina from './components/Cocina'
+import CocinaKDS from './components/CocinaKDS'
 import GestionProductos from './components/GestionProductos'
 
 export default function App() {
@@ -87,7 +87,7 @@ export default function App() {
       {/* RENDERIZADO DE PANTALLAS */}
       <main className="flex-1 max-w-[98%] w-full mx-auto p-4 md:p-6">
         {pestañaActiva === 'venta' && <PuntoVenta />}
-        {pestañaActiva === 'cocina' && <Cocina />}
+        {pestañaActiva === 'cocina' && <CocinaKDS />}
         {pestañaActiva === 'arqueo' && <ArqueoCaja />}
         {pestañaActiva === 'reportes' && <Reportes />}
         {pestañaActiva === 'productos' && <GestionProductos />}

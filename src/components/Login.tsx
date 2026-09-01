@@ -24,8 +24,9 @@ export default function Login({ onLoginSuccess }: LoginProps) {
 
       if (error) throw error
       onLoginSuccess()
-    } catch (err: any) {
-      setError(err.message || 'Error al iniciar sesión')
+    } catch (err: unknown) {
+      const errorObj = err as Error
+      setError(errorObj.message || 'Error al iniciar sesión')
     } finally {
       setCargando(false)
     }
@@ -34,7 +35,6 @@ export default function Login({ onLoginSuccess }: LoginProps) {
   return (
     <div className="min-h-screen bg-mordiscos-dark flex items-center justify-center p-4">
       <div className="bg-mordiscos-card p-8 rounded-2xl border border-gray-800 shadow-2xl w-full max-w-md space-y-6">
-        {/* LOGO E IDENTIDAD */}
         <div className="text-center space-y-3 flex flex-col items-center">
           <img 
             src="/logo.png" 
@@ -83,3 +83,17 @@ export default function Login({ onLoginSuccess }: LoginProps) {
               className="w-full bg-gray-900 border border-gray-800 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-mordiscos-orange"
               placeholder="••••••••"
             />
+          </div>
+
+          <button
+            type="submit"
+            disabled={cargando}
+            className="w-full bg-gradient-to-r from-mordiscos-red to-mordiscos-orange hover:opacity-90 text-white font-bold py-3 rounded-lg text-sm shadow-lg disabled:opacity-50 transition-all mt-2"
+          >
+            {cargando ? 'Iniciando Sesión...' : 'Iniciar Sesión'}
+          </button>
+        </form>
+      </div>
+    </div>
+  )
+}
