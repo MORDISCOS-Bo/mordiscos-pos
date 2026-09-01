@@ -10,6 +10,7 @@ export default function PuntoVenta() {
   const [carrito, setCarrito] = useState<ItemCarrito[]>([])
   const [tipoPedido, setTipoPedido] = useState<'mesa' | 'llevar' | 'delivery'>('mesa')
   const [metodoPago, setMetodoPago] = useState<'efectivo' | 'qr' | 'tarjeta'>('efectivo')
+  const [montoRecibido, setMontoRecibido] = useState<string>('')
   const [mesa, setMesa] = useState('')
   const [cliente, setCliente] = useState('')
   const [enviando, setEnviando] = useState(false)
@@ -30,7 +31,6 @@ export default function PuntoVenta() {
   }
 
   const cargarUltimosPedidos = async () => {
-    // Ordenamos por id descendente de forma simple
     const { data, error } = await supabase
       .from('pedidos')
       .select('*')
@@ -72,16 +72,20 @@ export default function PuntoVenta() {
   }
 
   const totalPedido = carrito.reduce((acc, item) => acc + item.producto.precio * item.cantidad, 0)
+  const efectivoPagado = parseFloat(montoRecibido) || 0
+  const cambioCalculado = efectivoPagado - totalPedido
 
   const handleCrearPedido = async () => {
     if (carrito.length === 0) return alert('El carrito está vacío.')
     if (tipoPedido === 'mesa' && !mesa) return alert('Por favor ingresa el número o nombre de mesa.')
+    if (metodoPago === 'efectivo' && efectivoPagado < totalPedido) {
+      return alert(`El monto ingresado (Bs ${efectivoPagado.toFixed(2)}) es menor al total (Bs ${totalPedido.toFixed(2)}).`)
+    }
 
     setEnviando(true)
     try {
       const user = (await supabase.auth.getUser()).data.user
 
-      // Obtener el número máximo registrado en la base de datos
       const { data: ultimos, error: errNum } = await supabase
         .from('pedidos')
         .select('numero_pedido')
@@ -123,11 +127,17 @@ export default function PuntoVenta() {
       const { error: errDetalles } = await supabase.from('pedido_detalles').insert(detalles)
       if (errDetalles) throw errDetalles
 
-      alert(`¡Pedido #${pedidoGuardado.numero_pedido} registrado exitosamente! 🍗`)
+      let mensajeModal = `¡Pedido #${pedidoGuardado.numero_pedido} registrado exitosamente! 🍗`
+      if (metodoPago === 'efectivo') {
+        mensajeModal += `\n\n💰 Total: Bs ${totalPedido.toFixed(2)}\n💵 Pago: Bs ${efectivoPagado.toFixed(2)}\n🔄 Vuelto: Bs ${cambioCalculado.toFixed(2)}`
+      }
+
+      alert(mensajeModal)
 
       setCarrito([])
       setMesa('')
       setCliente('')
+      setMontoRecibido('')
       cargarUltimosPedidos()
     } catch (err: unknown) {
       const error = err as Error
@@ -171,10 +181,10 @@ export default function PuntoVenta() {
         <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-thin relative z-10">
           <button
             onClick={() => setCatSeleccionada('todas')}
-            className={`px-4 py-2 rounded-lg text-xs font-bold whitespace-nowrap transition-colors ${
+            className={`px-5 py-2.5 rounded-xl text-xs font-bold whitespace-nowrap transition-colors shadow-sm ${
               catSeleccionada === 'todas'
                 ? 'bg-mordiscos-orange text-white'
-                : 'bg-mordiscos-card text-gray-400 border border-gray-800'
+                : 'bg-mordiscos-card text-gray-400 border border-gray-800 hover:text-white'
             }`}
           >
             Todas
@@ -183,10 +193,10 @@ export default function PuntoVenta() {
             <button
               key={c.id}
               onClick={() => setCatSeleccionada(c.id)}
-              className={`px-4 py-2 rounded-lg text-xs font-bold whitespace-nowrap transition-colors ${
+              className={`px-5 py-2.5 rounded-xl text-xs font-bold whitespace-nowrap transition-colors shadow-sm ${
                 catSeleccionada === c.id
                   ? 'bg-mordiscos-orange text-white'
-                  : 'bg-mordiscos-card text-gray-400 border border-gray-800'
+                  : 'bg-mordiscos-card text-gray-400 border border-gray-800 hover:text-white'
               }`}
             >
               {c.nombre}
@@ -210,7 +220,7 @@ export default function PuntoVenta() {
                       <button
                         key={prod.id}
                         onClick={() => agregarAlCarrito(prod)}
-                        className="bg-mordiscos-card/80 backdrop-blur-md hover:border-mordiscos-orange p-3 rounded-xl border border-gray-800/90 text-left transition-all flex flex-col justify-between h-28 shadow-md hover:scale-[1.02]"
+                        className="bg-mordiscos-card/80 backdrop-blur-md hover:border-mordiscos-orange p-3.5 rounded-xl border border-gray-800/90 text-left transition-all flex flex-col justify-between h-28 shadow-md hover:scale-[1.02]"
                       >
                         <div>
                           <p className="font-bold text-white text-sm line-clamp-2">{prod.nombre}</p>
@@ -233,7 +243,7 @@ export default function PuntoVenta() {
                   <button
                     key={prod.id}
                     onClick={() => agregarAlCarrito(prod)}
-                    className="bg-mordiscos-card/80 backdrop-blur-md hover:border-mordiscos-orange p-3 rounded-xl border border-gray-800/90 text-left transition-all flex flex-col justify-between h-28 shadow-md hover:scale-[1.02]"
+                    className="bg-mordiscos-card/80 backdrop-blur-md hover:border-mordiscos-orange p-3.5 rounded-xl border border-gray-800/90 text-left transition-all flex flex-col justify-between h-28 shadow-md hover:scale-[1.02]"
                   >
                     <div>
                       <p className="font-bold text-white text-sm line-clamp-2">{prod.nombre}</p>
@@ -251,7 +261,7 @@ export default function PuntoVenta() {
         <div className="relative z-10 pt-6 border-t border-gray-800">
           <h3 className="text-sm font-bold text-gray-300 mb-3 flex items-center justify-between">
             <span>Últimas Ventas Realizadas</span>
-            <span className="text-[10px] font-normal text-gray-500">(Para corregir errores)</span>
+            <span className="text-[10px] font-normal text-gray-500">(Para anular errores)</span>
           </h3>
 
           <div className="space-y-2">
@@ -261,22 +271,22 @@ export default function PuntoVenta() {
               ultimosPedidos.map((ped) => (
                 <div
                   key={ped.id}
-                  className="flex items-center justify-between p-2.5 bg-mordiscos-card/90 backdrop-blur-sm rounded-lg border border-gray-800/80 text-xs"
+                  className="flex items-center justify-between p-3 bg-mordiscos-card/90 backdrop-blur-sm rounded-xl border border-gray-800/80 text-xs shadow-sm"
                 >
                   <div>
-                    <span className="font-bold text-white">#{ped.numero_pedido || 'S/N'}</span>
-                    <span className="text-gray-400 ml-2 capitalize">({ped.tipo})</span>
-                    <span className="text-mordiscos-accent font-bold ml-3">Bs {ped.total.toFixed(2)}</span>
+                    <span className="font-bold text-white text-sm">#{ped.numero_pedido || 'S/N'}</span>
+                    <span className="text-gray-400 ml-2 capitalize font-medium">({ped.tipo})</span>
+                    <span className="text-mordiscos-accent font-extrabold ml-3">Bs {ped.total.toFixed(2)}</span>
                   </div>
 
                   {ped.estado === 'cancelado' ? (
-                    <span className="text-[10px] bg-red-900/50 text-red-400 border border-red-800/50 px-2 py-0.5 rounded font-bold">
+                    <span className="text-[10px] bg-red-900/50 text-red-400 border border-red-800/50 px-2.5 py-1 rounded-lg font-bold">
                       ANULADO
                     </span>
                   ) : (
                     <button
                       onClick={() => handleAnularPedido(ped)}
-                      className="bg-red-600/80 hover:bg-red-600 text-white text-[10px] px-2.5 py-1 rounded font-bold transition-all"
+                      className="bg-red-600/80 hover:bg-red-600 text-white text-xs px-3 py-1.5 rounded-lg font-bold transition-all shadow"
                     >
                       Anular Venta
                     </button>
@@ -288,22 +298,29 @@ export default function PuntoVenta() {
         </div>
       </div>
 
-      <div className="bg-mordiscos-card p-5 rounded-xl border border-gray-800 flex flex-col justify-between h-[calc(100vh-140px)] sticky top-4 z-10">
+      {/* PANEL DERECHO: COMANDA ACTUAL */}
+      <div className="bg-mordiscos-card p-5 rounded-xl border border-gray-800 flex flex-col justify-between h-[calc(100vh-140px)] sticky top-4 z-10 shadow-xl">
         <div>
-          <h3 className="text-lg font-bold text-mordiscos-orange border-b border-gray-800 pb-3 mb-4">
-            Comanda Actual
+          <h3 className="text-lg font-bold text-mordiscos-orange border-b border-gray-800 pb-3 mb-4 flex items-center justify-between">
+            <span>Comanda Actual</span>
+            {carrito.length > 0 && (
+              <span className="text-xs font-normal text-gray-400 bg-gray-800 px-2.5 py-1 rounded-full">
+                {carrito.reduce((acc, i) => acc + i.cantidad, 0)} ítems
+              </span>
+            )}
           </h3>
 
-          <div className="space-y-3 mb-4">
-            <div className="flex gap-2">
+          <div className="space-y-4 mb-4">
+            {/* BOTONES DE TIPO DE PEDIDO (MÁS GRANDES) */}
+            <div className="grid grid-cols-3 gap-2">
               {(['mesa', 'llevar', 'delivery'] as const).map((t) => (
                 <button
                   key={t}
                   onClick={() => setTipoPedido(t)}
-                  className={`flex-1 py-1.5 rounded-lg text-xs font-bold capitalize transition-colors ${
+                  className={`py-3.5 rounded-xl text-sm font-extrabold capitalize transition-all border shadow-sm ${
                     tipoPedido === t
-                      ? 'bg-mordiscos-red text-white'
-                      : 'bg-gray-900 text-gray-400 border border-gray-800'
+                      ? 'bg-mordiscos-red text-white border-mordiscos-red ring-2 ring-mordiscos-red/40'
+                      : 'bg-gray-900/90 text-gray-300 border-gray-800 hover:border-gray-700'
                   }`}
                 >
                   {t}
@@ -311,6 +328,7 @@ export default function PuntoVenta() {
               ))}
             </div>
 
+            {/* CAMPOS MESA Y CLIENTE */}
             <div className="grid grid-cols-2 gap-2">
               {tipoPedido === 'mesa' && (
                 <input
@@ -318,7 +336,7 @@ export default function PuntoVenta() {
                   placeholder="N° Mesa (Ej: M3)"
                   value={mesa}
                   onChange={(e) => setMesa(e.target.value)}
-                  className="px-3 py-1.5 bg-gray-900 border border-gray-800 rounded-lg text-white text-xs"
+                  className="px-3.5 py-2.5 bg-gray-900 border border-gray-800 rounded-xl text-white text-xs font-semibold focus:border-mordiscos-orange outline-none"
                 />
               )}
               <input
@@ -326,23 +344,26 @@ export default function PuntoVenta() {
                 placeholder="Cliente (Opcional)"
                 value={cliente}
                 onChange={(e) => setCliente(e.target.value)}
-                className={`px-3 py-1.5 bg-gray-900 border border-gray-800 rounded-lg text-white text-xs ${
+                className={`px-3.5 py-2.5 bg-gray-900 border border-gray-800 rounded-xl text-white text-xs font-semibold focus:border-mordiscos-orange outline-none ${
                   tipoPedido !== 'mesa' ? 'col-span-2' : ''
                 }`}
               />
             </div>
 
-            <div className="pt-2">
-              <label className="text-[10px] text-gray-400 uppercase font-semibold block mb-1">Método de Pago:</label>
-              <div className="grid grid-cols-3 gap-1.5">
+            {/* BOTONES MÉTODO DE PAGO (MÁS GRANDES) */}
+            <div>
+              <label className="text-[10px] text-gray-400 uppercase font-bold tracking-wider block mb-1.5">
+                MÉTODO DE PAGO:
+              </label>
+              <div className="grid grid-cols-3 gap-2">
                 {(['efectivo', 'qr', 'tarjeta'] as const).map((m) => (
                   <button
                     key={m}
                     onClick={() => setMetodoPago(m)}
-                    className={`py-1 rounded text-[11px] font-bold uppercase border transition-all ${
+                    className={`py-3 rounded-xl text-xs font-extrabold uppercase transition-all border shadow-sm ${
                       metodoPago === m
-                        ? 'bg-mordiscos-orange text-white border-mordiscos-orange'
-                        : 'bg-gray-900 text-gray-400 border-gray-800'
+                        ? 'bg-mordiscos-orange text-white border-mordiscos-orange ring-2 ring-mordiscos-orange/40'
+                        : 'bg-gray-900/90 text-gray-300 border-gray-800 hover:border-gray-700'
                     }`}
                   >
                     {m}
@@ -350,33 +371,67 @@ export default function PuntoVenta() {
                 ))}
               </div>
             </div>
+
+            {/* CALCULADORA DE VUELTOS (SÓLO SI ES EFECTIVO) */}
+            {metodoPago === 'efectivo' && (
+              <div className="bg-gray-900/80 p-3 rounded-xl border border-gray-800/80 space-y-2">
+                <div className="flex justify-between items-center text-xs">
+                  <span className="font-bold text-gray-300">Paga con (Bs):</span>
+                  <input
+                    type="number"
+                    placeholder="0.00"
+                    value={montoRecibido}
+                    onChange={(e) => setMontoRecibido(e.target.value)}
+                    className="w-28 px-3 py-1.5 bg-black/60 border border-gray-700 rounded-lg text-right text-white font-extrabold text-sm focus:border-mordiscos-orange outline-none"
+                  />
+                </div>
+
+                <div className="flex justify-between items-center text-xs pt-1 border-t border-gray-800">
+                  <span className="text-gray-400 font-semibold">Vuelto:</span>
+                  <span
+                    className={`font-black text-sm ${
+                      cambioCalculado < 0
+                        ? 'text-red-400'
+                        : efectivoPagado > 0
+                        ? 'text-emerald-400'
+                        : 'text-gray-500'
+                    }`}
+                  >
+                    Bs {cambioCalculado > 0 ? cambioCalculado.toFixed(2) : '0.00'}
+                  </span>
+                </div>
+              </div>
+            )}
           </div>
 
-          <div className="space-y-2 max-h-52 overflow-y-auto pr-1">
+          {/* LISTA DE ÍTEMS EN CARRITO */}
+          <div className="space-y-2 max-h-48 overflow-y-auto pr-1">
             {carrito.length === 0 ? (
-              <p className="text-xs text-gray-500 text-center py-8">Selecciona productos de la izquierda</p>
+              <p className="text-xs text-gray-500 text-center py-6 font-medium">
+                Selecciona productos de la izquierda
+              </p>
             ) : (
               carrito.map((item) => (
                 <div
                   key={item.producto.id}
-                  className="flex justify-between items-center p-2 bg-gray-900/60 rounded-lg border border-gray-800/80 text-xs"
+                  className="flex justify-between items-center p-2.5 bg-gray-900/60 rounded-xl border border-gray-800/80 text-xs"
                 >
                   <div className="flex-1 pr-2">
                     <p className="font-semibold text-white">{item.producto.nombre}</p>
-                    <p className="text-gray-400">Bs {item.producto.precio.toFixed(2)}</p>
+                    <p className="text-gray-400 text-[11px]">Bs {item.producto.precio.toFixed(2)}</p>
                   </div>
 
                   <div className="flex items-center gap-2">
                     <button
                       onClick={() => modificarCantidad(item.producto.id, -1)}
-                      className="w-6 h-6 bg-gray-800 hover:bg-gray-700 rounded font-bold text-white flex items-center justify-center"
+                      className="w-7 h-7 bg-gray-800 hover:bg-gray-700 active:scale-95 rounded-lg font-bold text-white flex items-center justify-center text-sm shadow"
                     >
                       -
                     </button>
-                    <span className="font-mono text-white font-bold">{item.cantidad}</span>
+                    <span className="font-mono text-white font-bold px-1">{item.cantidad}</span>
                     <button
                       onClick={() => modificarCantidad(item.producto.id, 1)}
-                      className="w-6 h-6 bg-gray-800 hover:bg-gray-700 rounded font-bold text-white flex items-center justify-center"
+                      className="w-7 h-7 bg-gray-800 hover:bg-gray-700 active:scale-95 rounded-lg font-bold text-white flex items-center justify-center text-sm shadow"
                     >
                       +
                     </button>
@@ -387,16 +442,17 @@ export default function PuntoVenta() {
           </div>
         </div>
 
+        {/* TOTAL Y CONFIRMACIÓN */}
         <div className="border-t border-gray-800 pt-4 mt-4 space-y-3">
           <div className="flex justify-between text-base font-extrabold text-white">
             <span>Total:</span>
-            <span className="text-mordiscos-accent">Bs {totalPedido.toFixed(2)}</span>
+            <span className="text-mordiscos-accent text-xl">Bs {totalPedido.toFixed(2)}</span>
           </div>
 
           <button
             onClick={handleCrearPedido}
             disabled={enviando || carrito.length === 0}
-            className="w-full bg-gradient-to-r from-mordiscos-red to-mordiscos-orange hover:opacity-90 text-white font-bold py-3 rounded-lg text-sm shadow-lg disabled:opacity-40 transition-all"
+            className="w-full bg-gradient-to-r from-mordiscos-red to-mordiscos-orange hover:opacity-90 active:scale-[0.99] text-white font-black py-4 rounded-xl text-base shadow-xl disabled:opacity-40 transition-all uppercase tracking-wide"
           >
             {enviando ? 'Enviando Pedido...' : 'Confirmar y Enviar Pedido'}
           </button>
