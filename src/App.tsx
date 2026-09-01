@@ -3,7 +3,7 @@ import PuntoVenta from './components/PuntoVenta'
 import ArqueoCaja from './components/ArqueoCaja'
 import Reportes from './components/Reportes'
 import Cocina from './components/Cocina'
-import Productos from './components/Productos'
+import GestionProductos from './components/GestionProductos'
 
 export default function App() {
   const [pestañaActiva, setPestañaActiva] = useState<
@@ -16,6 +16,7 @@ export default function App() {
       <header className="bg-mordiscos-card border-b border-gray-800 p-3 sticky top-0 z-50 shadow-md">
         <div className="max-w-[98%] mx-auto flex flex-wrap justify-between items-center gap-3">
           
+          {/* LOGO Y NOMBRE */}
           <div className="flex items-center gap-3">
             <img src="/logo.png" alt="Mordiscos Logo" className="w-9 h-9 object-contain" />
             <h1 className="font-black text-xl text-white tracking-wider">
@@ -23,6 +24,7 @@ export default function App() {
             </h1>
           </div>
 
+          {/* MENÚ DE NAVEGACIÓN */}
           <nav className="flex items-center gap-1.5 bg-gray-900/80 p-1.5 rounded-xl border border-gray-800 text-xs">
             <button
               onClick={() => setPestañaActiva('venta')}
@@ -82,13 +84,13 @@ export default function App() {
         </div>
       </header>
 
-      {/* CONTENIDO PRINCIPAL */}
+      {/* RENDERIZADO DE PANTALLAS */}
       <main className="flex-1 max-w-[98%] w-full mx-auto p-4 md:p-6">
         {pestañaActiva === 'venta' && <PuntoVenta />}
         {pestañaActiva === 'cocina' && <Cocina />}
         {pestañaActiva === 'arqueo' && <ArqueoCaja />}
         {pestañaActiva === 'reportes' && <Reportes />}
-        {pestañaActiva === 'productos' && <Productos />}
+        {pestañaActiva === 'productos' && <GestionProductos />}
       </main>
     </div>
   )

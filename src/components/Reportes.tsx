@@ -2,9 +2,6 @@ import { useEffect, useState } from 'react'
 import { supabase } from '../lib/supabase'
 import type { Pedido } from '../types/database'
 
-// 🔑 CLAVE DE AUTORIZACIÓN PARA ELIMINAR/ANULAR VENTAS
-const CLAVE_ANULACION = '1234'
-
 export default function Reportes() {
   const [pedidos, setPedidos] = useState<Pedido[]>([])
   const [cargando, setCargando] = useState(true)
@@ -19,16 +16,13 @@ export default function Reportes() {
     setErrorMsj(null)
     
     try {
-      // Intentamos traer los pedidos. Eliminamos el order por 'created_at' para evitar el choque.
       const { data, error } = await supabase
         .from('pedidos')
         .select('*')
 
       if (error) {
-        console.error('Error Supabase:', error)
         setErrorMsj(error.message)
       } else if (data) {
-        // Ordenamos los pedidos en el cliente por numero_pedido o por id
         const datosOrdenados = [...data].sort((a, b) => {
           if (a.numero_pedido && b.numero_pedido) {
             return b.numero_pedido - a.numero_pedido
@@ -40,43 +34,37 @@ export default function Reportes() {
 
         setPedidos(datosOrdenados)
       }
-    } catch (err: any) {
-      console.error('Error general:', err)
-      setErrorMsj(err.message || 'Error desconocido')
+    } catch (err: unknown) {
+      const error = err as Error
+      setErrorMsj(error.message || 'Error desconocido')
     } finally {
       setCargando(false)
     }
   }
 
-  // FUNCIÓN PARA ANULAR VENTA CON CONTRASEÑA
   const handleAnularPedido = async (pedido: Pedido) => {
     const clave = prompt(
       `Ingresa la contraseña de autorización para anular el pedido #${pedido.numero_pedido || ''}:`
     )
 
-    if (clave === null) return // Cancelado por el usuario
-
-    if (clave !== CLAVE_ANULACION) {
-      alert('❌ Contraseña incorrecta. No tienes permiso para anular ventas.')
-      return
-    }
+    if (clave === null) return
 
     try {
-      const { error } = await supabase
-        .from('pedidos')
-        .update({ estado: 'cancelado' })
-        .eq('id', pedido.id)
+      const { error } = await supabase.rpc('anular_pedido_con_clave', {
+        p_pedido_id: pedido.id,
+        p_clave: clave
+      })
 
       if (error) throw error
 
       alert(`✅ Pedido #${pedido.numero_pedido || ''} anulado correctamente.`)
-      cargarReportes() // Recargar la tabla
-    } catch (err: any) {
-      alert('Error al anular el pedido: ' + err.message)
+      cargarReportes()
+    } catch (err: unknown) {
+      const error = err as Error
+      alert('Error al anular el pedido: ' + error.message)
     }
   }
 
-  // Métricas calculadas (excluyendo ventas anuladas/canceladas)
   const pedidosValidos = pedidos.filter((p) => p.estado !== 'cancelado')
   const totalIngresos = pedidosValidos.reduce((acc, p) => acc + (p.total || 0), 0)
   const totalPedidos = pedidosValidos.length
@@ -85,7 +73,6 @@ export default function Reportes() {
 
   return (
     <div className="space-y-6">
-      {/* CABECERA */}
       <div className="flex justify-between items-center">
         <div>
           <h2 className="text-xl font-bold text-white flex items-center gap-2">
@@ -107,7 +94,6 @@ export default function Reportes() {
         </div>
       )}
 
-      {/* TARJETAS DE MÉTRICAS */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <div className="bg-mordiscos-card p-4 rounded-xl border border-gray-800">
           <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Total Ingresos</p>
@@ -130,7 +116,6 @@ export default function Reportes() {
         </div>
       </div>
 
-      {/* TABLA: HISTORIAL DE COMANDAS */}
       <div className="bg-mordiscos-card rounded-xl border border-gray-800 overflow-hidden">
         <div className="p-4 border-b border-gray-800">
           <h3 className="font-bold text-white text-sm">Historial de Comandas</h3>

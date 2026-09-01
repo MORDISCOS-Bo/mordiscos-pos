@@ -2,9 +2,6 @@ import { useEffect, useState } from 'react'
 import { supabase } from '../lib/supabase'
 import type { Categoria, Producto, ItemCarrito, Pedido } from '../types/database'
 
-// 🔑 CLAVE DE AUTORIZACIÓN PARA ANULAR VENTAS
-const CLAVE_ANULACION = '1234'
-
 export default function PuntoVenta() {
   const [categorias, setCategorias] = useState<Categoria[]>([])
   const [productos, setProductos] = useState<Producto[]>([])
@@ -16,8 +13,6 @@ export default function PuntoVenta() {
   const [mesa, setMesa] = useState('')
   const [cliente, setCliente] = useState('')
   const [enviando, setEnviando] = useState(false)
-
-  // Estado para las últimas ventas
   const [ultimosPedidos, setUltimosPedidos] = useState<Pedido[]>([])
 
   useEffect(() => {
@@ -26,10 +21,11 @@ export default function PuntoVenta() {
   }, [])
 
   const cargarCatalogo = async () => {
-    const { data: catData } = await supabase.from('categorias').select('*').order('nombre')
+    const [{ data: catData }, { data: prodData }] = await Promise.all([
+      supabase.from('categorias').select('*').order('nombre'),
+      supabase.from('productos').select('*').eq('disponible', true).order('nombre')
+    ])
     if (catData) setCategorias(catData)
-
-    const { data: prodData } = await supabase.from('productos').select('*').eq('disponible', true).order('nombre')
     if (prodData) setProductos(prodData)
   }
 
@@ -65,13 +61,12 @@ export default function PuntoVenta() {
           }
           return item
         })
-        .filter(Boolean) as ItemCarrito[]
+        .filter((item): item is ItemCarrito => item !== null)
     )
   }
 
   const totalPedido = carrito.reduce((acc, item) => acc + item.producto.precio * item.cantidad, 0)
 
-  // CREAR PEDIDO REINICIANDO NÚMERO SEGÚN EL ÚLTIMO ARQUEO DE CAJA
   const handleCrearPedido = async () => {
     if (carrito.length === 0) return alert('El carrito está vacío.')
     if (tipoPedido === 'mesa' && !mesa) return alert('Por favor ingresa el número o nombre de mesa.')
@@ -80,7 +75,6 @@ export default function PuntoVenta() {
     try {
       const user = (await supabase.auth.getUser()).data.user
 
-      // 1. Obtener la fecha del último cierre de caja
       const { data: ultimoArqueo } = await supabase
         .from('arqueo_caja')
         .select('created_at')
@@ -90,7 +84,6 @@ export default function PuntoVenta() {
 
       const fechaUltimoCierre = ultimoArqueo?.created_at || null
 
-      // 2. Contar cuántos pedidos existen DESPUÉS del último cierre
       let queryPedidos = supabase
         .from('pedidos')
         .select('id', { count: 'exact', head: true })
@@ -102,7 +95,6 @@ export default function PuntoVenta() {
       const { count } = await queryPedidos
       const nuevoNumeroPedido = (count || 0) + 1
 
-      // 3. Crear el pedido con el nuevo número correlativo
       const { data: pedidoGuardado, error: errPedido } = await supabase
         .from('pedidos')
         .insert([
@@ -139,45 +131,37 @@ export default function PuntoVenta() {
       setMesa('')
       setCliente('')
       cargarUltimosPedidos()
-    } catch (err: any) {
-      alert('Error enviando el pedido: ' + err.message)
+    } catch (err: unknown) {
+      const error = err as Error
+      alert('Error enviando el pedido: ' + error.message)
     } finally {
       setEnviando(false)
     }
   }
 
-  // ANULAR VENTA CON CONTRASEÑA
   const handleAnularPedido = async (pedido: Pedido) => {
     const clave = prompt(`Ingresa la contraseña de autorización para anular el pedido #${pedido.numero_pedido || ''}:`)
-
     if (clave === null) return
 
-    if (clave !== CLAVE_ANULACION) {
-      alert('❌ Contraseña incorrecta. No tienes permisos para anular ventas.')
-      return
-    }
-
     try {
-      const { error } = await supabase
-        .from('pedidos')
-        .update({ estado: 'cancelado' })
-        .eq('id', pedido.id)
+      const { error } = await supabase.rpc('anular_pedido_con_clave', {
+        p_pedido_id: pedido.id,
+        p_clave: clave
+      })
 
       if (error) throw error
 
       alert(`✅ Venta #${pedido.numero_pedido || ''} anulada correctamente.`)
       cargarUltimosPedidos()
-    } catch (err: any) {
-      alert('Error al anular la venta: ' + err.message)
+    } catch (err: unknown) {
+      const error = err as Error
+      alert('Error al anular la venta: ' + error.message)
     }
   }
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 relative">
-      {/* SECCIÓN IZQUIERDA: Catálogo y Últimas Ventas */}
       <div className="lg:col-span-2 space-y-6 relative min-h-[500px]">
-        
-        {/* LOGO MARCA DE AGUA GIGANTE CENTRADO */}
         <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-0 opacity-15 overflow-hidden">
           <img 
             src="/logo.png" 
@@ -186,7 +170,6 @@ export default function PuntoVenta() {
           />
         </div>
 
-        {/* Categorías */}
         <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-thin relative z-10">
           <button
             onClick={() => setCatSeleccionada('todas')}
@@ -213,7 +196,6 @@ export default function PuntoVenta() {
           ))}
         </div>
 
-        {/* Productos */}
         <div className="space-y-6 relative z-10">
           {catSeleccionada === 'todas' ? (
             categorias.map((cat) => {
@@ -268,7 +250,6 @@ export default function PuntoVenta() {
           )}
         </div>
 
-        {/* Últimas Ventas */}
         <div className="relative z-10 pt-6 border-t border-gray-800">
           <h3 className="text-sm font-bold text-gray-300 mb-3 flex items-center justify-between">
             <span>Últimas Ventas Realizadas</span>
@@ -307,10 +288,8 @@ export default function PuntoVenta() {
             )}
           </div>
         </div>
-
       </div>
 
-      {/* SECCIÓN DERECHA: Comanda / Carrito */}
       <div className="bg-mordiscos-card p-5 rounded-xl border border-gray-800 flex flex-col justify-between h-[calc(100vh-140px)] sticky top-4 z-10">
         <div>
           <h3 className="text-lg font-bold text-mordiscos-orange border-b border-gray-800 pb-3 mb-4">
