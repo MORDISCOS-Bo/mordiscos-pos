@@ -2,23 +2,18 @@ import { useState } from 'react'
 import PuntoVenta from './components/PuntoVenta'
 import ArqueoCaja from './components/ArqueoCaja'
 import Reportes from './components/Reportes'
-// Si tienes los otros componentes creados, impórtalos aquí:
-// import Cocina from './components/Cocina'
-// import Productos from './components/Productos'
 
 export default function App() {
-  // Estado para controlar qué pestaña está activa
   const [pestañaActiva, setPestañaActiva] = useState<
     'venta' | 'cocina' | 'arqueo' | 'reportes' | 'productos'
   >('venta')
 
   return (
     <div className="min-h-screen bg-mordiscos-bg text-gray-100 flex flex-col font-sans">
-      {/* BARRA DE NAVEGACIÓN SUPERIOR */}
+      {/* BARRA SUPERIOR DE NAVEGACIÓN */}
       <header className="bg-mordiscos-card border-b border-gray-800 p-3 sticky top-0 z-50 shadow-md">
         <div className="max-w-7xl mx-auto flex flex-wrap justify-between items-center gap-3">
           
-          {/* Logo y Nombre */}
           <div className="flex items-center gap-3">
             <img src="/logo.png" alt="Mordiscos Logo" className="w-8 h-8 object-contain" />
             <h1 className="font-black text-lg text-white tracking-wider">
@@ -26,7 +21,6 @@ export default function App() {
             </h1>
           </div>
 
-          {/* BOTONES DE NAVEGACIÓN */}
           <nav className="flex items-center gap-1.5 bg-gray-900/80 p-1 rounded-xl border border-gray-800 text-xs">
             <button
               onClick={() => setPestañaActiva('venta')}
@@ -86,7 +80,7 @@ export default function App() {
         </div>
       </header>
 
-      {/* CONTENIDO PRINCIPAL SEGÚN LA PESTAÑA SELECCIONADA */}
+      {/* RENDERIZADO EXCLUSIVO DE CADA PANTALLA */}
       <main className="flex-1 max-w-7xl w-full mx-auto p-4 md:p-6">
         {pestañaActiva === 'venta' && <PuntoVenta />}
         
@@ -95,14 +89,16 @@ export default function App() {
         {pestañaActiva === 'reportes' && <Reportes />}
 
         {pestañaActiva === 'cocina' && (
-          <div className="text-center py-12 text-gray-500 font-bold">
-            🍳 Módulo de Cocina (KDS) en construcción...
+          <div className="flex flex-col items-center justify-center py-20 text-gray-500 gap-2">
+            <span className="text-4xl">🍳</span>
+            <p className="font-bold text-sm">Módulo de Cocina (KDS) en construcción...</p>
           </div>
         )}
 
         {pestañaActiva === 'productos' && (
-          <div className="text-center py-12 text-gray-500 font-bold">
-            📋 Módulo de Productos en construcción...
+          <div className="flex flex-col items-center justify-center py-20 text-gray-500 gap-2">
+            <span className="text-4xl">📋</span>
+            <p className="font-bold text-sm">Módulo de Productos en construcción...</p>
           </div>
         )}
       </main>
