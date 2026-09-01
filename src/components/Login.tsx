@@ -41,7 +41,7 @@ export default function Login({ onLoginSuccess }: LoginProps) {
             alt="Mordiscos Logo" 
             className="h-20 w-auto object-contain drop-shadow-md" 
             onError={(e) => {
-              e.currentTarget.style.display = 'none';
+              e.currentTarget.style.display = 'none'
             }}
           />
           <div>
@@ -83,17 +83,3 @@ export default function Login({ onLoginSuccess }: LoginProps) {
               className="w-full bg-gray-900 border border-gray-800 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-mordiscos-orange"
               placeholder="••••••••"
             />
-          </div>
-
-          <button
-            type="submit"
-            disabled={cargando}
-            className="w-full bg-gradient-to-r from-mordiscos-red to-mordiscos-orange hover:opacity-90 text-white font-bold py-3 rounded-lg text-sm shadow-lg disabled:opacity-50 transition-all mt-2"
-          >
-            {cargando ? 'Iniciando Sesión...' : 'Iniciar Sesión'}
-          </button>
-        </form>
-      </div>
-    </div>
-  )
-}
