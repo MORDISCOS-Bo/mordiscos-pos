@@ -33,7 +33,7 @@ export default function PuntoVenta() {
     const { data } = await supabase
       .from('pedidos')
       .select('*')
-      .order('id', { ascending: false })
+      .order('created_at', { ascending: false })
       .limit(10)
 
     if (data) setUltimosPedidos(data)
@@ -75,25 +75,15 @@ export default function PuntoVenta() {
     try {
       const user = (await supabase.auth.getUser()).data.user
 
-      const { data: ultimoArqueo } = await supabase
-        .from('arqueo_caja')
-        .select('created_at')
+      // Obtener el último número de pedido registrado hoy para incrementar correlativo
+      const { data: ultimoPedidoRegistrado } = await supabase
+        .from('pedidos')
+        .select('numero_pedido')
         .order('created_at', { ascending: false })
         .limit(1)
         .maybeSingle()
 
-      const fechaUltimoCierre = ultimoArqueo?.created_at || null
-
-      let queryPedidos = supabase
-        .from('pedidos')
-        .select('id', { count: 'exact', head: true })
-
-      if (fechaUltimoCierre) {
-        queryPedidos = queryPedidos.gt('created_at', fechaUltimoCierre)
-      }
-
-      const { count } = await queryPedidos
-      const nuevoNumeroPedido = (count || 0) + 1
+      const nuevoNumeroPedido = (ultimoPedidoRegistrado?.numero_pedido || 0) + 1
 
       const { data: pedidoGuardado, error: errPedido } = await supabase
         .from('pedidos')
