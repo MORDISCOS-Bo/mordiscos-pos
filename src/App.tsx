@@ -12,21 +12,23 @@ export default function App() {
     <div className="min-h-screen bg-mordiscos-bg text-gray-100 flex flex-col font-sans">
       {/* BARRA SUPERIOR DE NAVEGACIÓN */}
       <header className="bg-mordiscos-card border-b border-gray-800 p-3 sticky top-0 z-50 shadow-md">
-        <div className="max-w-7xl mx-auto flex flex-wrap justify-between items-center gap-3">
+        <div className="max-w-[98%] mx-auto flex flex-wrap justify-between items-center gap-3">
           
+          {/* Nombre y Marca Oficial */}
           <div className="flex items-center gap-3">
-            <img src="/logo.png" alt="Mordiscos Logo" className="w-8 h-8 object-contain" />
-            <h1 className="font-black text-lg text-white tracking-wider">
-              MORDISCOS <span className="text-mordiscos-orange text-xs font-bold">POS</span>
+            <img src="/logo.png" alt="Mordiscos Logo" className="w-9 h-9 object-contain" />
+            <h1 className="font-black text-xl text-white tracking-wider">
+              MORDISCOS <span className="text-mordiscos-orange text-sm font-bold ml-1">Wings Restobar</span>
             </h1>
           </div>
 
-          <nav className="flex items-center gap-1.5 bg-gray-900/80 p-1 rounded-xl border border-gray-800 text-xs">
+          {/* Menú de Navegación */}
+          <nav className="flex items-center gap-1.5 bg-gray-900/80 p-1.5 rounded-xl border border-gray-800 text-xs">
             <button
               onClick={() => setPestañaActiva('venta')}
-              className={`px-3 py-1.5 rounded-lg font-bold transition-all flex items-center gap-1.5 ${
+              className={`px-3.5 py-1.5 rounded-lg font-bold transition-all flex items-center gap-1.5 ${
                 pestañaActiva === 'venta'
-                  ? 'bg-mordiscos-orange text-white shadow'
+                  ? 'bg-mordiscos-orange text-white shadow-md'
                   : 'text-gray-400 hover:text-white'
               }`}
             >
@@ -35,9 +37,9 @@ export default function App() {
 
             <button
               onClick={() => setPestañaActiva('cocina')}
-              className={`px-3 py-1.5 rounded-lg font-bold transition-all flex items-center gap-1.5 ${
+              className={`px-3.5 py-1.5 rounded-lg font-bold transition-all flex items-center gap-1.5 ${
                 pestañaActiva === 'cocina'
-                  ? 'bg-mordiscos-orange text-white shadow'
+                  ? 'bg-mordiscos-orange text-white shadow-md'
                   : 'text-gray-400 hover:text-white'
               }`}
             >
@@ -46,9 +48,9 @@ export default function App() {
 
             <button
               onClick={() => setPestañaActiva('arqueo')}
-              className={`px-3 py-1.5 rounded-lg font-bold transition-all flex items-center gap-1.5 ${
+              className={`px-3.5 py-1.5 rounded-lg font-bold transition-all flex items-center gap-1.5 ${
                 pestañaActiva === 'arqueo'
-                  ? 'bg-mordiscos-orange text-white shadow'
+                  ? 'bg-mordiscos-orange text-white shadow-md'
                   : 'text-gray-400 hover:text-white'
               }`}
             >
@@ -57,9 +59,9 @@ export default function App() {
 
             <button
               onClick={() => setPestañaActiva('reportes')}
-              className={`px-3 py-1.5 rounded-lg font-bold transition-all flex items-center gap-1.5 ${
+              className={`px-3.5 py-1.5 rounded-lg font-bold transition-all flex items-center gap-1.5 ${
                 pestañaActiva === 'reportes'
-                  ? 'bg-mordiscos-orange text-white shadow'
+                  ? 'bg-mordiscos-orange text-white shadow-md'
                   : 'text-gray-400 hover:text-white'
               }`}
             >
@@ -68,9 +70,9 @@ export default function App() {
 
             <button
               onClick={() => setPestañaActiva('productos')}
-              className={`px-3 py-1.5 rounded-lg font-bold transition-all flex items-center gap-1.5 ${
+              className={`px-3.5 py-1.5 rounded-lg font-bold transition-all flex items-center gap-1.5 ${
                 pestañaActiva === 'productos'
-                  ? 'bg-mordiscos-orange text-white shadow'
+                  ? 'bg-mordiscos-orange text-white shadow-md'
                   : 'text-gray-400 hover:text-white'
               }`}
             >
@@ -80,8 +82,8 @@ export default function App() {
         </div>
       </header>
 
-      {/* RENDERIZADO EXCLUSIVO DE CADA PANTALLA */}
-      <main className="flex-1 max-w-7xl w-full mx-auto p-4 md:p-6">
+      {/* CONTENIDO PRINCIPAL A ANCHO COMPLETO */}
+      <main className="flex-1 max-w-[98%] w-full mx-auto p-4 md:p-6">
         {pestañaActiva === 'venta' && <PuntoVenta />}
         
         {pestañaActiva === 'arqueo' && <ArqueoCaja />}
