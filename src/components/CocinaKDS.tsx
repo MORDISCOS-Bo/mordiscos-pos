@@ -6,7 +6,7 @@ interface DetallePedido {
   cantidad: number
   productos: {
     nombre: string
-  } | null
+  } | { nombre: string }[] | null
 }
 
 interface PedidoCocina {
@@ -26,10 +26,14 @@ export default function Cocina() {
 
   useEffect(() => {
     cargarPedidosCocina()
-    // Suscripción en tiempo real para nuevos pedidos
+
+    // Suscripción en tiempo real para cambios en pedidos y detalles
     const channel = supabase
-      .channel('cambios-cocina')
+      .channel('cambios-cocina-realtime')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'pedidos' }, () => {
+        cargarPedidosCocina()
+      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'pedido_detalles' }, () => {
         cargarPedidosCocina()
       })
       .subscribe()
@@ -63,10 +67,13 @@ export default function Cocina() {
         .in('estado', ['pendiente', 'en_preparacion'])
         .order('created_at', { ascending: true })
 
-      if (error) console.error('Error cargando comanda:', error)
-      else if (data) setPedidos(data as any)
+      if (error) {
+        console.error('Error cargando comanda:', error)
+      } else if (data) {
+        setPedidos(data as unknown as PedidoCocina[])
+      }
     } catch (err) {
-      console.error(err)
+      console.error('Error inesperado:', err)
     } finally {
       setCargando(false)
     }
@@ -81,9 +88,18 @@ export default function Cocina() {
 
       if (error) throw error
       cargarPedidosCocina()
-    } catch (err: any) {
-      alert('Error cambiando estado: ' + err.message)
+    } catch (err: unknown) {
+      const errorObj = err as Error
+      alert('Error cambiando estado: ' + errorObj.message)
     }
+  }
+
+  const obtenerNombreProducto = (prod: DetallePedido['productos']) => {
+    if (!prod) return 'Producto'
+    if (Array.isArray(prod)) {
+      return prod[0]?.nombre || 'Producto'
+    }
+    return prod.nombre || 'Producto'
   }
 
   return (
@@ -97,7 +113,7 @@ export default function Cocina() {
         </div>
         <button
           onClick={cargarPedidosCocina}
-          className="bg-gray-800 hover:bg-gray-700 text-white text-xs px-3 py-1.5 rounded-lg border border-gray-700"
+          className="bg-gray-800 hover:bg-gray-700 text-white text-xs px-3 py-1.5 rounded-lg border border-gray-700 font-semibold"
         >
           🔄 Actualizar
         </button>
@@ -144,12 +160,16 @@ export default function Cocina() {
 
                 {/* Lista de Items */}
                 <div className="space-y-1.5">
-                  {p.pedido_detalles?.map((det) => (
-                    <div key={det.id} className="flex justify-between text-xs font-semibold text-gray-200">
-                      <span>{det.productos?.nombre || 'Producto'}</span>
-                      <span className="font-bold text-mordiscos-orange">x{det.cantidad}</span>
-                    </div>
-                  ))}
+                  {p.pedido_detalles && p.pedido_detalles.length > 0 ? (
+                    p.pedido_detalles.map((det) => (
+                      <div key={det.id} className="flex justify-between text-xs font-semibold text-gray-200">
+                        <span>{obtenerNombreProducto(det.productos)}</span>
+                        <span className="font-bold text-mordiscos-orange">x{det.cantidad}</span>
+                      </div>
+                    ))
+                  ) : (
+                    <p className="text-xs text-gray-500 italic">Sin detalles agregados</p>
+                  )}
                 </div>
               </div>
 

@@ -6,7 +6,7 @@ export default function PuntoVenta() {
   const [categorias, setCategorias] = useState<Categoria[]>([])
   const [productos, setProductos] = useState<Producto[]>([])
   const [catSeleccionada, setCatSeleccionada] = useState<string>('todas')
-  
+
   const [carrito, setCarrito] = useState<ItemCarrito[]>([])
   const [tipoPedido, setTipoPedido] = useState<'mesa' | 'llevar' | 'delivery'>('mesa')
   const [metodoPago, setMetodoPago] = useState<'efectivo' | 'qr' | 'tarjeta'>('efectivo')
@@ -126,7 +126,7 @@ export default function PuntoVenta() {
       if (errDetalles) throw errDetalles
 
       alert(`¡Pedido #${pedidoGuardado.numero_pedido} registrado exitosamente! 🍗`)
-      
+
       setCarrito([])
       setMesa('')
       setCliente('')
